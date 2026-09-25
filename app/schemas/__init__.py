@@ -1,21 +1,19 @@
 from app.schemas.health import HealthResponse
-from app.schemas.user import UserBase, UserCreate, UserRead
-from app.schemas.profile import ProfileBase, ProfileCreate, ProfileRead
-from app.schemas.support_program import SupportProgramBase, SupportProgramCreate, SupportProgramRead
-from app.schemas.application import ApplicationBase, ApplicationCreate, ApplicationRead
+from app.schemas.user import UserRead
+from app.schemas.profile import ProfileUpsert, ProfileRead
+from app.schemas.support_program import SupportProgramRead, SupportProgramMatchRead
+from app.schemas.application import ApplicationCreate, ApplicationRead
+from app.schemas.classify import ClassifyRequest, ClassifyResponse
 
 __all__ = [
     "HealthResponse",
-    "UserBase",
-    "UserCreate",
     "UserRead",
-    "ProfileBase",
-    "ProfileCreate",
+    "ProfileUpsert",
     "ProfileRead",
-    "SupportProgramBase",
-    "SupportProgramCreate",
     "SupportProgramRead",
-    "ApplicationBase",
+    "SupportProgramMatchRead",
     "ApplicationCreate",
     "ApplicationRead",
+    "ClassifyRequest",
+    "ClassifyResponse",
 ]

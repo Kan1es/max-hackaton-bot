@@ -1,6 +1,22 @@
-# Max Hackathon Backend
+# Max Hackathon
 
-FastAPI + PostgreSQL бэкенд сервис с готовой асинхронной архитектурой (SQLAlchemy 2.0 + asyncpg), системой миграций Alembic и контейнеризацией через Docker & Docker Compose.
+«Навигатор мер поддержки» — бот и mini app для MAX, которые помогают самозанятым/ИП находить гранты, льготные займы, субсидии и налоговые льготы. Backend — FastAPI + PostgreSQL (Alembic), диалоговый бот — отдельный сервис на [`maxapi`](bot/README.md), интерфейс mini app — в отдельной папке [`miniapp/`](miniapp/README.md).
+
+## MAX-бот
+
+Диалог сбора профиля (статус → регион → сфера → приоритет), синхронизация с Postgres на каждом шаге, подбор программ и выдача результата — см. [bot/README.md](bot/README.md). Поднимается вместе с остальным стеком через `docker compose up --build` (сервис `bot`).
+
+## Mini app
+
+Локальный запуск интерфейса:
+
+```bash
+cd miniapp
+npm ci
+npm run dev
+```
+
+Проверка сборки: `npm run build`. Для отдельного контейнера: `docker build -t max-support-miniapp ./miniapp`. Подробности и ограничения демо описаны в [miniapp/README.md](miniapp/README.md). Интерфейс пока хранит профиль и сохранённые программы в браузере (мок-данные); backend уже предоставляет полноценные `/api/profile/`, `/api/programs/match/{id}` и `/api/applications/` — подключение mini app к этому API вместо локального мока остаётся отдельной задачей.
 
 ---
 
@@ -20,37 +36,45 @@ FastAPI + PostgreSQL бэкенд сервис с готовой асинхро�
 ```text
 .
 ├── Dockerfile                  # Описание сборки контейнера FastAPI
-├── docker-compose.yml          # Стек приложения (FastAPI + PostgreSQL)
-├── requirements.txt            # Python-зависимости
-├── .env.example                # Пример переменных окружения
+├── docker-compose.yml          # Стек приложения (FastAPI + PostgreSQL + бот)
+├── bot/                        # MAX-бот (диалог, maxapi) — см. bot/README.md
+├── miniapp/                    # React/Vite mini app с отдельным Dockerfile
+├── requirements.txt            # Python-зависимости backend
+├── .env.example                # Пример переменных окружения (backend + бот)
 ├── alembic.ini                 # Конфигурация Alembic
 ├── alembic/
 │   ├── env.py                  # Асинхронный запуск миграций
 │   └── versions/
 │       └── 0001_initial.py     # Начальная миграция всех моделей
 └── app/
-    ├── main.py                 # Входная точка приложения FastAPI
+    ├── main.py                 # Входная точка FastAPI + автосидинг мок-каталога программ
     ├── core/
     │   ├── config.py           # Настройки проекта (Pydantic Settings)
+    │   ├── options.py          # Канонические варианты диалога (в т.ч. для бота/mini app)
     │   └── database.py         # Подключение к PostgreSQL (AsyncSession)
+    ├── db/
+    │   ├── seed.py             # Загрузка мок-каталога программ при первом старте
+    │   └── seed_data/support_programs.json
+    ├── services/
+    │   └── matching.py         # Rule-based подбор программ (регион+сфера+приоритет)
     ├── models/                 # SQLAlchemy модели
     │   ├── base.py             # Базовый класс и TimestampMixin
-    │   ├── user.py             # Модель пользователей (User)
-    │   ├── profile.py          # Модель профилей (Profile)
-    │   ├── support_program.py  # Модель мер поддержки (SupportProgram)
-    │   └── application.py      # Модель заявок (Application)
+    │   ├── user.py             # Пользователь MAX (User)
+    │   ├── profile.py          # Профиль, собранный ботом (Profile)
+    │   ├── support_program.py  # Каталог мер поддержки (SupportProgram)
+    │   ├── match.py            # Результаты подбора (Match)
+    │   └── application.py      # «Мои заявки» (Application)
     ├── schemas/                # Pydantic схемы (DTO)
-    │   ├── health.py
-    │   ├── user.py
-    │   ├── profile.py
-    │   ├── support_program.py
-    │   └── application.py
     └── api/
         ├── router.py
         └── v1/
             ├── router.py
             └── endpoints/
-                └── health.py   # Эндпоинт проверки здоровья сервиса и БД
+                ├── health.py       # Проверка здоровья сервиса и БД
+                ├── profiles.py     # POST /api/profile/
+                ├── programs.py     # GET /api/programs/match/{id}, /api/programs/{id}
+                ├── applications.py # POST/GET /api/applications/
+                └── classify.py     # POST /api/classify/ (заглушка NLP)
 ```
 
 ---
@@ -59,38 +83,27 @@ FastAPI + PostgreSQL бэкенд сервис с готовой асинхро�
 
 1. **`users` (`User`)**:
    - `id`: Первичный ключ
-   - `email`: Уникальный e-mail пользователя
-   - `hashed_password`: Хеш пароля (опционально)
-   - `role`: Роль (`applicant`, `admin`, `specialist`)
-   - `is_active`: Флаг активности
-   - `created_at`, `updated_at`: Аудит времени
+   - `max_user_id`: Уникальный идентификатор пользователя в MAX
+   - `created_at`: Аудит времени
 
-2. **`profiles` (`Profile`)**:
-   - `id`: Первичный ключ
-   - `user_id`: Внешний ключ на `users.id` (1-to-1)
-   - `first_name`, `last_name`, `middle_name`, `phone`, `birth_date`, `city`, `region`
-   - `category`: Категория гражданина/бизнеса (студент, самозанятый, многодетная семья и т.д.)
-   - `details`: `JSON` поле для гибких параметров скоринга и матчинга
+2. **`profiles` (`Profile`)** — заполняется ботом по шагам, поля nullable до завершения диалога:
+   - `id`, `user_id` (FK → `users.id`, 1-to-1)
+   - `status`: `Самозанятый` / `Регистрирую ИП` / `ИП`
+   - `region`: регион работы
+   - `industry`: сфера деятельности
+   - `priority`: `Развитие` / `Деньги на старт` / `Льготный займ` / `Обучение` / `Налоговые льготы`
 
-3. **`support_programs` (`SupportProgram`)**:
-   - `id`: Первичный ключ
-   - `title`: Название программы
-   - `slug`: Уникальный код/слаг
-   - `description`: Подробное описание
-   - `category`: Направление (субсидии, гранты, льготы и т.д.)
-   - `provider`: Организация / ведомство
-   - `eligibility_criteria`: `JSON` критерии отбора для алгоритмов подбора
-   - `financial_benefit`, `max_amount`: Финансовые параметры
-   - `is_active`, `start_date`, `end_date`: Период действия
+   Варианты значений — единый источник [`app/core/options.py`](app/core/options.py), синхронизированный с ботом (`bot/options.py`) и mini app (`miniapp/src/data/programs.js`).
 
-4. **`applications` (`Application`)**:
-   - `id`: Первичный ключ
-   - `user_id`: Ссылка на заявителя (`users.id`)
-   - `program_id`: Ссылка на программу (`support_programs.id`)
-   - `status`: Статус (`draft`, `submitted`, `in_review`, `approved`, `rejected`)
-   - `applicant_data`: `JSON` снимок ответов/документов
-   - `submitted_at`: Дата отправки
-   - `reviewer_notes`: Комментарии проверяющего
+3. **`support_programs` (`SupportProgram`)** — каталог мер поддержки:
+   - `id`, `name`, `description`, `region`, `industries[]`, `conditions`, `type` (вид поддержки — грант/кредит/субсидия/льгота), `amount`, `deadline`, `doc_checklist[]`, `source_url`
+   - `is_mock`: `True` — данные пока тестовый снапшот (см. `app/db/seed_data/support_programs.json`, 19 программ)
+
+4. **`matches` (`Match`)** — история подбора для аналитики:
+   - `id`, `profile_id` (FK), `program_id` (FK), `score`, `created_at`
+
+5. **`applications` (`Application`)** — «Мои заявки»:
+   - `id`, `profile_id` (FK), `program_id` (FK), `status` (`saved` / `in_progress` / `submitted`), `created_at`
 
 ---
 
@@ -148,6 +161,8 @@ FastAPI + PostgreSQL бэкенд сервис с готовой асинхро�
 
 ## 📡 Эндпоинты
 
+Базовый путь: `/api/v1`.
+
 - **`GET /health`** (и **`GET /api/v1/health`**):
   Возвращает состояние сервиса и статус подключения к PostgreSQL:
   ```json
@@ -157,6 +172,14 @@ FastAPI + PostgreSQL бэкенд сервис с готовой асинхро�
     "version": "0.1.0"
   }
   ```
+- **`POST /api/v1/profile/`** — создать/частично обновить профиль по `max_user_id` (вызывается ботом после каждого шага диалога).
+- **`GET /api/v1/profile/by-max-user/{max_user_id}`** — получить профиль по идентификатору пользователя MAX.
+- **`GET /api/v1/programs/`** — список всех программ каталога.
+- **`GET /api/v1/programs/match/{profile_id}`** — топ-3 подходящие программы (rule-based, см. [`app/services/matching.py`](app/services/matching.py)); результат сохраняется в `matches`.
+- **`GET /api/v1/programs/{id}`** — карточка программы.
+- **`POST /api/v1/applications/`** — сохранить программу в «Мои заявки».
+- **`GET /api/v1/applications/{profile_id}`** — список сохранённых заявок профиля.
+- **`POST /api/v1/classify/`** — определение сферы деятельности по свободному тексту. Пока заглушка на ключевых словах (`app/api/v1/endpoints/classify.py`) — интеграция настоящей модели (rubert-tiny2) отдельным этапом.
 
 ---
 

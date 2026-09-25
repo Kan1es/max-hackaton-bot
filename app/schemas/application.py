@@ -1,24 +1,23 @@
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Optional
+
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.support_program import SupportProgramRead
 
-class ApplicationBase(BaseModel):
+
+class ApplicationCreate(BaseModel):
+    profile_id: int
     program_id: int
-    status: str = "draft"
-    applicant_data: Optional[Dict[str, Any]] = None
-    reviewer_notes: Optional[str] = None
+    status: str = "saved"
 
 
-class ApplicationCreate(ApplicationBase):
-    user_id: int
-
-
-class ApplicationRead(ApplicationBase):
+class ApplicationRead(BaseModel):
     id: int
-    user_id: int
-    submitted_at: Optional[datetime] = None
+    profile_id: int
+    program_id: int
+    status: str
     created_at: datetime
-    updated_at: datetime
+    program: Optional[SupportProgramRead] = None
 
     model_config = ConfigDict(from_attributes=True)

@@ -1,0 +1,7 @@
+# MAX-team-verified fork (see https://github.com/max-messenger/max-botapi-python#-установка-из-github).
+# The PyPI `maxapi` package tracks the original (unverified) fork instead —
+# switch to `maxapi>=1.2.0,<2.0.0` if you prefer PyPI releases.
+git+https://github.com/max-messenger/max-botapi-python.git
+httpx>=0.27.0,<1.0.0
+pydantic-settings>=2.2.0,<3.0.0
+python-dotenv>=1.0.1,<2.0.0

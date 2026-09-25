@@ -5,7 +5,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.database import engine, get_db
+from app.core.database import AsyncSessionLocal, engine, get_db
+from app.db.seed import seed_support_programs
 from app.models.base import Base
 from app.schemas.health import HealthResponse
 from app.api.v1.router import api_router
@@ -21,6 +22,11 @@ async def lifespan(app: FastAPI):
                 await conn.run_sync(Base.metadata.create_all)
         except Exception as e:
             print(f"[Warning] Failed to auto-create tables on startup: {e}")
+    try:
+        async with AsyncSessionLocal() as session:
+            await seed_support_programs(session)
+    except Exception as e:
+        print(f"[Warning] Failed to seed support programs: {e}")
     yield
     # Shutdown logic
     await engine.dispose()

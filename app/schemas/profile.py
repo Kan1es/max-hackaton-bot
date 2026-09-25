@@ -1,27 +1,25 @@
-from datetime import date, datetime
-from typing import Any, Dict, Optional
+from datetime import datetime
+from typing import Optional
+
 from pydantic import BaseModel, ConfigDict
 
 
-class ProfileBase(BaseModel):
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    middle_name: Optional[str] = None
-    phone: Optional[str] = None
-    birth_date: Optional[date] = None
-    city: Optional[str] = None
+class ProfileUpsert(BaseModel):
+    """Payload the bot sends after every answered dialog step (partial upsert)."""
+    max_user_id: int
+    status: Optional[str] = None
     region: Optional[str] = None
-    category: Optional[str] = None
-    details: Optional[Dict[str, Any]] = None
+    industry: Optional[str] = None
+    priority: Optional[str] = None
 
 
-class ProfileCreate(ProfileBase):
-    user_id: int
-
-
-class ProfileRead(ProfileBase):
+class ProfileRead(BaseModel):
     id: int
     user_id: int
+    status: Optional[str] = None
+    region: Optional[str] = None
+    industry: Optional[str] = None
+    priority: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
