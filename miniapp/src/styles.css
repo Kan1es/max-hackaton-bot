@@ -9,7 +9,7 @@ button { cursor: pointer; }
 button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid #96b8f7; outline-offset: 2px; }
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: 250px minmax(0, 1fr); background: #f7f9ff; color: #1e2a3a; }
 .sidebar { background: #fff; border-right: 1px solid #edf0f7; padding: 28px 16px 22px; display: flex; flex-direction: column; min-height: 100vh; position: sticky; top: 0; height: 100vh; }
-.brand { display: flex; align-items: center; gap: 11px; padding: 1px 12px 42px; }
+.brand { display: flex; align-items: center; gap: 11px; padding: 1px 12px 24px; }
 .brand-mark, .mobile-brand-mark { position: relative; display: block; overflow: hidden; flex: none; }
 .brand-mark { width: 42px; height: 42px; }
 .mobile-brand-mark { width: 26px; height: 26px; }
@@ -17,7 +17,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .brand strong, .brand span { display: block; line-height: 1.1; }
 .brand strong { font-size: 17px; font-weight: 800; letter-spacing: -.4px; }
 .brand span { margin-top: 4px; font-size: 12px; color: #7d8999; font-weight: 600; }
-.sidebar-caption { padding: 0 13px 13px; color: #8491a2; font-size: 12px; font-weight: 800; letter-spacing: .08em; }
 .sidebar nav { display: grid; gap: 4px; }
 .side-nav-item { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; border-radius: 11px; padding: 13px 12px; background: transparent; color: #667386; text-align: left; font-weight: 700; font-size: 13px; }
 .side-nav-item:hover { background: #f4f8ff; color: #2065cf; }
@@ -27,9 +26,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .demo-badge { display: inline-block; margin: 18px 12px 0; color: #8794a6; font-size: 12px; }
 .app-content { min-width: 0; }
 .desktop-header { height: 76px; background: white; border-bottom: 1px solid #edf0f7; display: flex; align-items: center; justify-content: space-between; padding: 0 clamp(24px, 4vw, 54px); }
-.desktop-header > div > span, .desktop-header > div > b { display: block; }
-.desktop-header > div > span { color: #8391a3; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.desktop-header > div > b { margin-top: 4px; font-size: 16px; }
+.desktop-header > div > b { display: block; font-size: 16px; }
 .header-profile { display: flex; align-items: center; gap: 9px; color: #26364a; border: 0; background: none; font-size: 13px; font-weight: 700; }
 .header-profile svg { color: #9ca9b7; }
 main { width: min(100%, 1330px); margin: 0 auto; }
@@ -219,31 +216,40 @@ h1,h2,h3,p { margin-top: 0; }
 .setting-row input[type=checkbox] { accent-color: #1b69d8; width: 17px; height: 17px; }
 .settings-note { border-top: 1px solid #eef1f6; padding-top: 10px; margin-top: 7px !important; font-size: 12px !important; }
 .info-row small { color: #748398; font-size: 12px; }
-.document-layout { display: grid; grid-template-columns: minmax(0, 620px) minmax(280px, .85fr); gap: 20px; }
+.document-layout { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(300px, .95fr); gap: 20px; align-items: start; }
 .document-info h2 { font-size: 23px; font-weight: 600; letter-spacing: -.03em; margin: 12px 0 18px; }
 .document-point { display: flex; align-items: flex-start; gap: 11px; margin: 13px 0; }
+.document-point > div { min-width: 0; }
 .document-point strong { font-size: 13px; display: block; margin: 1px 0 3px; }
 .document-point p { margin: 0; }
-.document-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 17px; }
-.document-stats > div { background: #f5f7fc; border-radius: 8px; padding: 10px; }
-.document-stats small, .document-stats strong { display: block; }
-.document-stats small { color: #61738a; font-size: 12px; }
-.document-stats strong { font-size: 13px; margin-top: 3px; }
-.document-locations > h2 { font-size: 15px; margin: 2px 0 12px; }
-.demo-caption { color: #718198; font-size: 12px; font-weight: 500; margin-left: 5px; }
-.map-art { height: 172px; border-radius: 13px; position: relative; overflow: hidden; background: #f1f0ed; margin-bottom: 11px; }
-.road { position: absolute; display: block; width: 150%; height: 9px; background: white; transform-origin: center; }
-.road-a { left: -20%; top: 46%; transform: rotate(10deg); }
-.road-b { left: -42%; top: 61%; transform: rotate(-38deg); }
-.road-c { left: 17%; top: 36%; transform: rotate(70deg); }
-.pin { position: absolute; z-index: 1; display: grid; place-items: center; background: #1f6dd8; color: white; width: 29px; height: 29px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 6px rgba(26,85,160,.15); }
-.pin svg { width: 14px; }
-.pin-a { left: 27%; top: 26%; }.pin-b { left: 69%; top: 41%; }.pin-c { left: 46%; top: 72%; }
-.location-card { padding: 13px; margin-top: 9px; }
-.location-card strong, .location-card span, .location-card small { display: block; }
-.location-card strong { font-size: 13px; }
-.location-card span { color: #607288; font-size: 12px; margin-top: 8px; }
-.location-card small { color: #61738a; font-size: 12px; display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+.document-steps { margin: 6px 0 0; padding-left: 18px; color: #607288; font-size: 13px; line-height: 1.55; }
+.document-steps li + li { margin-top: 5px; }
+.document-source, .location-external { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; color: #1b69d8; font-size: 13px; font-weight: 700; text-decoration: none; }
+.document-source:hover, .location-external:hover { text-decoration: underline; }
+.document-caveat { margin: 18px 0 0 !important; padding: 11px 12px; border-radius: 9px; background: #f5f7fc; color: #62738a; font-size: 12px !important; }
+.document-self-note h2 { font-size: 16px; margin: 12px 0 8px; }
+.document-self-note p { margin-bottom: 0; }
+.locations-heading { display: flex; justify-content: space-between; align-items: start; gap: 10px; margin-bottom: 11px; }
+.locations-heading h2 { font-size: 16px; margin: 1px 0 5px; }
+.locations-heading p { color: #697d94; font-size: 12px; margin: 0; }
+.location-button { display: inline-flex; align-items: center; gap: 5px; flex: none; padding: 8px 9px; border: 1px solid #cfe0fa; border-radius: 8px; background: white; color: #1d67ce; font-size: 11px; font-weight: 800; }
+.location-button:hover { background: #f1f7ff; }
+.office-map, .location-empty { width: 100%; height: 270px; border-radius: 13px; overflow: hidden; background: #e8eef5; margin-bottom: 11px; }
+.location-empty { display: grid; place-items: center; padding: 20px; text-align: center; color: #64758a; font-size: 13px; }
+.office-map-icon, .office-map-user { display: grid; place-items: center; border-radius: 50%; background: white; box-shadow: 0 2px 8px #203d6070; }
+.office-map-icon span { width: 15px; height: 15px; border-radius: 50%; background: #1d6cdb; border: 2px solid white; }
+.office-map-user span { width: 13px; height: 13px; border-radius: 50%; background: #18a69b; border: 2px solid white; }
+.location-status { display: flex; align-items: center; gap: 6px; color: #62738a; font-size: 12px; margin: 8px 0; }
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.location-card { display: block; width: 100%; padding: 12px 13px; margin-top: 8px; border: 1px solid #e4ebf5; border-radius: 11px; background: #fff; color: #23354a; text-align: left; }
+.location-card:hover, .location-card.selected { border-color: #9fc5f5; background: #f7fbff; }
+.location-card-title { display: flex !important; align-items: center; gap: 5px; margin: 0 !important; color: #23354a !important; }
+.location-card-title svg { flex: none; color: #1d6cdb; }
+.location-card-title strong { flex: 1; font-size: 13px; }
+.location-card-title b { color: #1d67ce; font-size: 12px; white-space: nowrap; }
+.location-card > span:not(.location-card-title), .location-card small { display: block; color: #607288; font-size: 12px; margin: 6px 0 0 21px; }
+.locations-note { color: #7a899b; font-size: 11px; line-height: 1.45; margin: 9px 0 0; }
 
 @media (max-width: 1090px) {
   .app-shell { grid-template-columns: 210px minmax(0,1fr); }

@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft, ArrowRight, Bell, Bookmark, BriefcaseBusiness, Check, CheckCircle2,
-  ChevronRight, CircleHelp, Clock3, ExternalLink, FileText, Filter, Laptop,
+  ChevronRight, CircleHelp, ExternalLink, FileText, Filter, Laptop,
   LineChart, Mail, MapPin, Search, ShieldCheck, SlidersHorizontal, Sparkles,
   UserRound, X, Landmark, ListChecks, Pencil,
 } from 'lucide-react';
@@ -9,6 +9,8 @@ import {
   programs, initialProfile, options, rankPrograms, programKind,
   deadlineLabel, matchReasons, sourceIsHttp,
 } from './data/programs.js';
+import { documentInfo } from './data/documents.js';
+import DocumentLocations from './DocumentLocations.jsx';
 
 const STORAGE_KEY = 'max-support-navigator-demo-v1';
 const baseState = {
@@ -269,14 +271,16 @@ function ProfilePage({ profile, onProfile, notices, digest, onNotices, onDigest,
 }
 
 function DocumentPage({ name, region, onBack }) {
-  const isEgrip = /ЕГРИП|ЕГРЮЛ|выписк/i.test(name);
+  const info = documentInfo(name);
   return <div className="page page-document"><PageHeading title="Документ" onBack={onBack} />
-    <div className="document-layout"><Card className="document-info"><span className="pill pill-green">{isEgrip ? 'Можно получить онлайн' : 'Подготовьте заранее'}</span><h2>{name}</h2>
-      <div className="document-point"><IconSquare icon={FileText} /><div><strong>Что это</strong><p>{isEgrip ? 'Документ со сведениями об индивидуальном предпринимателе из государственного реестра.' : 'Документ, который может потребоваться для подтверждения условий программы поддержки.'}</p></div></div>
-      <div className="document-point"><IconSquare icon={ShieldCheck} /><div><strong>Зачем нужен</strong><p>{isEgrip ? 'Подтверждает регистрацию и актуальные данные ИП при подаче заявки.' : 'Организатор использует его для проверки сведений в заявке.'}</p></div></div>
-      <div className="document-point"><IconSquare icon={Landmark} /><div><strong>Где получить</strong><p>{isEgrip ? 'Онлайн на сайте ФНС или лично в центре обслуживания.' : 'Уточните способ получения и требования к форме у организатора программы.'}</p></div></div>
-      {isEgrip && <div className="document-stats"><div><small>Оформление</small><strong>5–10 минут</strong></div><div><small>Срок действия</small><strong>Зависит от программы</strong></div></div>}
-    </Card>{isEgrip && region === 'Москва' && <div className="document-locations"><h2>Ближайшие пункты <span className="demo-caption">Пример для Москвы</span></h2><div className="map-art" aria-label="Схематичная карта с пунктами обслуживания"><span className="road road-a" /><span className="road road-b" /><span className="road road-c" /><i className="pin pin-a"><MapPin size={17} /></i><i className="pin pin-b"><MapPin size={17} /></i><i className="pin pin-c"><MapPin size={17} /></i></div><Card className="location-card"><strong>Центр госуслуг «Мои документы»</strong><span>Пресненская наб., 2</span><small><Clock3 size={13} /> Сегодня до 20:00</small></Card><Card className="location-card"><strong>Инспекция ФНС № 3</strong><span>ул. Анатолия Живова, 2</span><small><Clock3 size={13} /> Пн–Пт, 9:00–18:00</small></Card></div>}</div>
+    <div className="document-layout"><Card className="document-info"><span className={`pill ${info.office ? 'pill-green' : 'pill-blue'}`}>{info.label}</span><h2>{name}</h2>
+      <div className="document-point"><IconSquare icon={FileText} /><div><strong>Что это</strong><p>{info.what}</p></div></div>
+      <div className="document-point"><IconSquare icon={ShieldCheck} /><div><strong>Зачем нужен</strong><p>{info.why}</p></div></div>
+      <div className="document-point"><IconSquare icon={ListChecks} /><div><strong>Как подготовить</strong><ol className="document-steps">{info.steps.map(step => <li key={step}>{step}</li>)}</ol></div></div>
+      <div className="document-point"><IconSquare icon={FileText} /><div><strong>Что понадобится</strong><p>{info.prepare}</p></div></div>
+      <div className="document-point"><IconSquare icon={Landmark} /><div><strong>Где получить</strong><p>{info.where}</p>{info.link && <a className="document-source" href={info.link} target="_blank" rel="noreferrer">{info.linkLabel} <ExternalLink size={14} /></a>}</div></div>
+      <p className="document-caveat">Точные требования к форме и сроку действия документа проверьте в правилах выбранной программы.</p>
+    </Card>{info.office ? <DocumentLocations office={info.office} region={region} /> : <Card className="document-self-note"><IconSquare icon={CircleHelp} tone="blue" /><h2>Пункт выдачи не требуется</h2><p>Этот материал обычно готовит сам заявитель или выдаёт указанная в правилах программы организация. Проверьте источник и шаблон в условиях программы.</p></Card>}</div>
   </div>;
 }
 
@@ -337,8 +341,8 @@ export default function App() {
   const selectedProgram = programs[page.id];
 
   return <div className="app-shell">
-    <aside className="sidebar"><div className="brand"><div className="brand-mark"><img src="/logo.png" alt="" /></div><div><strong>Навигатор</strong><span>мер поддержки</span></div></div><div className="sidebar-caption">ВАШЕ ПРОСТРАНСТВО</div><nav aria-label="Основная навигация">{navItems.map(({ id, label, icon: Icon }) => <button key={id} className={`side-nav-item ${activeTab === id ? 'active' : ''}`} onClick={() => goTab(id)}><Icon size={20} /><span>{label}</span>{id === 'saved' && <small>{saved.length}</small>}</button>)}</nav><div className="sidebar-bottom"><span className="demo-badge">Демо-версия</span></div></aside>
-    <div className="app-content"><header className="desktop-header"><div><span>MAX mini app</span><b>Меры поддержки бизнеса</b></div><button className="header-profile" onClick={() => goTab('profile')}><span className="avatar small">{profile.name.split(' ').map(part => part[0]).slice(0, 2).join('')}</span><span>{profile.name}</span><ChevronRight size={16} /></button></header><main>
+    <aside className="sidebar"><div className="brand"><div className="brand-mark"><img src="/logo.png" alt="" /></div><div><strong>Навигатор</strong><span>мер поддержки</span></div></div><nav aria-label="Основная навигация">{navItems.map(({ id, label, icon: Icon }) => <button key={id} className={`side-nav-item ${activeTab === id ? 'active' : ''}`} onClick={() => goTab(id)}><Icon size={20} /><span>{label}</span>{id === 'saved' && <small>{saved.length}</small>}</button>)}</nav><div className="sidebar-bottom"><span className="demo-badge">Демо-версия</span></div></aside>
+    <div className="app-content"><header className="desktop-header"><div><b>Меры поддержки бизнеса</b></div><button className="header-profile" onClick={() => goTab('profile')}><span className="avatar small">{profile.name.split(' ').map(part => part[0]).slice(0, 2).join('')}</span><span>{profile.name}</span><ChevronRight size={16} /></button></header><main>
       {page.type === 'home' && <HomePage profile={profile} saved={saved} recommendations={recommendations} onCatalog={() => goTab('catalog')} onOpen={openDetail} onProfile={() => goTab('profile')} />}
       {page.type === 'catalog' && <CatalogPage profile={profile} saved={saved} onOpen={openDetail} onSave={toggleSaved} onBack={() => goTab('home')} />}
       {page.type === 'detail' && selectedProgram && <DetailPage program={selectedProgram} profile={profile} saved={saved.includes(selectedProgram.id)} onSave={toggleSaved} onChecklist={() => openChecklist(selectedProgram.id)} onBack={back} />}
