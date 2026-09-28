@@ -1,0 +1,31 @@
+# Public entry point. Caddy obtains and renews the Let's Encrypt certificate
+# for {$DOMAIN} by itself (HTTP-01 challenge on port 80), as soon as the
+# domain's A record points here.
+#
+# HTTPS_PORT exists because the VPS may already have 443 taken (a VPN, say):
+# the site is then served on e.g. https://maxnalog.ru:8444 and port 80 still
+# answers the ACME challenge and redirects browsers there.
+{
+	https_port {$HTTPS_PORT:443}
+}
+
+{$DOMAIN}, www.{$DOMAIN} {
+	tls {
+		issuer acme {
+			# The TLS-ALPN challenge always arrives on 443, which may not be ours.
+			disable_tlsalpn_challenge
+		}
+	}
+	@www host www.{$DOMAIN}
+	redir @www https://{$DOMAIN}{uri} permanent
+
+	encode gzip
+	reverse_proxy miniapp:80
+}
+
+# Plain-HTTP visitors go to the HTTPS site, port included. (Caddy's own
+# redirect drops a non-standard port.) ACME challenges on port 80 are
+# answered before this route, so certificates still get issued.
+http://{$DOMAIN}, http://www.{$DOMAIN} {
+	redir https://{$DOMAIN}:{$HTTPS_PORT:443}{uri} permanent
+}

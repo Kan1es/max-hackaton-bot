@@ -1,4 +1,6 @@
-version: "3.9"
+# Production-shaped stack. Local conveniences (hot reload, exposed Postgres
+# port, unsigned auth) live in docker-compose.override.yml, which Compose
+# loads automatically — delete or ignore that file when deploying for real.
 
 services:
   db:
@@ -9,8 +11,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-hackaton_db}
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -25,9 +25,8 @@ services:
       dockerfile: Dockerfile
     container_name: hackaton_fastapi
     restart: unless-stopped
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    volumes:
-      - .:/app
+    # Migrations are the schema source of truth: apply them before serving.
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     ports:
       - "${PORT:-8000}:8000"
     env_file:
@@ -35,6 +34,12 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-hackaton_db}
       - SYNC_DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-hackaton_db}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     depends_on:
       db:
         condition: service_healthy
@@ -49,8 +54,25 @@ services:
       - .env
     environment:
       - BACKEND_BASE_URL=http://web:8000/api/v1
+    # The bot fetches its keyboards from /options/ on startup, so it needs the
+    # API to actually be answering — not merely started.
     depends_on:
-      - web
+      web:
+        condition: service_healthy
+
+  miniapp:
+    build:
+      context: ./miniapp
+      dockerfile: Dockerfile
+    container_name: hackaton_miniapp
+    restart: unless-stopped
+    ports:
+      - "${MINIAPP_PORT:-8080}:80"
+    # nginx proxies /api to the backend, so the mini-app calls its own origin
+    # and there is no CORS or mixed-content problem to solve in the browser.
+    depends_on:
+      web:
+        condition: service_healthy
 
 volumes:
   postgres_data:

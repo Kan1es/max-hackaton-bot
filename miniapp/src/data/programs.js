@@ -1,60 +1,42 @@
-import rawPrograms from './support_programs.json';
+/**
+ * Presentation helpers for programs coming from the API.
+ *
+ * This file used to carry its own copy of the catalog, the option lists and
+ * the matching rules — a second implementation that had already drifted from
+ * the backend's. All of that now lives on the server: the catalog comes from
+ * GET /api/v1/programs/, the options from /options/ and the ranking from
+ * /programs/match/me. What is left here is purely how things are displayed.
+ */
 
-const clean = (value = '') => String(value).replace(/\[web:\d+\]/g, '').replace(/\s+/g, ' ').trim();
+/** Map an API program (snake_case) onto the shape the components render. */
+export function normalizeProgram(raw) {
+  const documents = raw.doc_checklist || [];
+  return {
+    id: raw.id,
+    title: raw.short_title || raw.name,
+    fullTitle: raw.name,
+    description: raw.description || '',
+    region: raw.region || '',
+    industries: raw.industries || [],
+    eligibleStatus: raw.eligible_status || '',
+    type: raw.type || '',
+    amount: raw.amount || '',
+    highlight: raw.highlight || (raw.amount || '').split(/[;.]/)[0].slice(0, 56),
+    conditions: raw.conditions || '',
+    deadline: raw.deadline || '',
+    documents,
+    sourceUrl: raw.source_url || '',
+    checkedAt: raw.checked_at || '',
+    isMock: Boolean(raw.is_mock),
+    // Present only on /programs/match/me results.
+    reasons: raw.reasons || [],
+    score: raw.score,
+  };
+}
 
-const titles = {
-  4: 'Грант для молодых предпринимателей',
-  7: 'Льготный кредит для IT-компаний',
-  8: 'Субсидия на цифровизацию бизнеса',
-};
-
-const highlights = {
-  0: 'от 500 000 ₽',
-  2: 'до 350 000 ₽',
-  3: 'гранты на развитие',
-  4: 'до 500 000 ₽',
-  7: 'от 2,5% годовых',
-  8: 'до 50% затрат',
-  14: 'до 5 000 000 ₽',
-  18: '307 008 ₽',
-};
-
-export const programs = rawPrograms.map((item, index) => ({
-  id: index,
-  title: titles[index] || clean(item.название),
-  fullTitle: clean(item.название),
-  description: clean(item.краткое_описание),
-  region: clean(item.регион),
-  industries: (item.подходящие_сферы || []).map(clean),
-  eligibleStatus: clean(item.допустимый_статус_пользователя),
-  type: clean(item.вид_поддержки),
-  amount: clean(item.сумма),
-  highlight: highlights[index] || clean(item.сумма).split(/[;.]/)[0].slice(0, 56),
-  conditions: clean(item.основные_условия),
-  deadline: clean(item.дедлайн),
-  documents: (item.чек_лист_документов || []).map(clean),
-  sourceUrl: item.ссылка_на_официальный_источник,
-  checkedAt: item.дата_проверки_информации,
-  isMock: true,
-}));
-
-export const initialProfile = {
-  name: 'Анна Ковалёва',
-  status: 'Самозанятый',
-  region: 'Москва',
-  industry: 'IT',
-  priority: 'Развитие',
-};
-
-export const options = {
-  status: ['Самозанятый', 'Регистрирую ИП', 'ИП'],
-  region: ['Москва', 'Московская область', 'Краснодарский край', 'Санкт-Петербург', 'Другой регион'],
-  industry: ['IT', 'Услуги', 'Торговля', 'Производство', 'Туризм', 'Сельское хозяйство', 'Креативные индустрии'],
-  priority: ['Развитие', 'Деньги на старт', 'Льготный займ', 'Обучение', 'Налоговые льготы'],
-};
-
+/** Coarse bucket used for the colour pill and the catalog filter chips. */
 export function programKind(program) {
-  const type = program.type.toLowerCase();
+  const type = (program.type || '').toLowerCase();
   if (type.includes('кредит') || type.includes('займ')) return 'Кредит';
   if (type.includes('грант')) return 'Грант';
   if (type.includes('субсид') || type.includes('компенсац')) return 'Субсидия';
@@ -63,58 +45,29 @@ export function programKind(program) {
 }
 
 export function deadlineLabel(program) {
-  const deadline = program.deadline.toLowerCase();
+  const deadline = (program.deadline || '').toLowerCase();
   if (deadline.includes('постоянн')) return 'Постоянно';
   if (deadline.includes('ежегодно') || deadline.includes('волнами') || deadline.includes('конкурс')) return 'По конкурсу';
   if (deadline.includes('2026')) return 'В 2026 году';
   return 'Уточните срок';
 }
 
-export function matchesRegion(program, region) {
-  const text = program.region.toLowerCase();
-  if (text.includes('росси') || text.includes('все регионы')) return true;
-  return text.includes(region.toLowerCase());
-}
-
-function industryMatch(program, industry) {
-  const corpus = [program.fullTitle, program.description, ...program.industries].join(' ').toLowerCase();
-  const terms = {
-    IT: ['it', 'цифров', 'разработк', 'онлайн', 'интернет', 'программного обеспечения'],
-    Услуги: ['услуг', 'сервис', 'социальн'],
-    Торговля: ['торгов', 'рознич'],
-    Производство: ['производ', 'промышлен', 'обрабатыва'],
-    Туризм: ['туризм', 'отел', 'гостиниц'],
-    'Сельское хозяйство': ['сельск', 'агро', 'фермер'],
-    'Креативные индустрии': ['креатив', 'творчес'],
-  }[industry] || [];
-  return terms.some(term => corpus.includes(term));
-}
-
-export function matchReasons(program, profile) {
-  const reasons = [];
-  if (matchesRegion(program, profile.region)) reasons.push('доступна в вашем регионе');
-  if (industryMatch(program, profile.industry)) reasons.push('подходит по сфере');
-  const kind = programKind(program);
-  if (
-    (profile.priority === 'Льготный займ' && kind === 'Кредит') ||
-    (profile.priority === 'Налоговые льготы' && kind === 'Льгота') ||
-    (profile.priority === 'Деньги на старт' && ['Грант', 'Субсидия', 'Поддержка'].includes(kind)) ||
-    (profile.priority === 'Развитие' && ['Грант', 'Кредит', 'Субсидия'].includes(kind))
-  ) reasons.push('соответствует вашему приоритету');
-  return reasons;
-}
-
-export function rankPrograms(profile) {
-  return programs
-    .filter(program => matchesRegion(program, profile.region))
-    .map(program => ({ program, reasons: matchReasons(program, profile) }))
-    .filter(item => item.reasons.length >= 2)
-    .sort((a, b) => {
-      const score = item => item.reasons.length * 10 + ([4, 7, 8].includes(item.program.id) ? 1 : 0);
-      return score(b) - score(a);
-    });
+/** Short region caption for cards; federal programs read as "Вся Россия". */
+export function regionLabel(program) {
+  const region = program.region || '';
+  if (!region) return 'Регион не указан';
+  if (/росси|все регион/i.test(region)) return 'Вся Россия';
+  return region;
 }
 
 export function sourceIsHttp(url) {
   try { return new URL(url).protocol === 'https:'; } catch { return false; }
 }
+
+export function formatCheckedAt(value) {
+  if (!value) return null;
+  const date = new Date(`${value}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString('ru-RU');
+}
+
+export const KIND_FILTERS = ['Все', 'Грант', 'Кредит', 'Субсидия', 'Льгота', 'Поддержка'];

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Float, ForeignKey, func
+from sqlalchemy import DateTime, Float, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -12,8 +12,16 @@ if TYPE_CHECKING:
 
 
 class Match(Base):
-    """Result of the rule-based matching engine, kept for history/analytics."""
+    """Current recommendation set for a profile, kept for analytics.
+
+    Upserted by GET /api/v1/programs/match/me rather than appended, so the
+    table holds one row per (profile, program) instead of growing by three
+    rows every time the mini-app is opened.
+    """
     __tablename__ = "matches"
+    __table_args__ = (
+        UniqueConstraint("profile_id", "program_id", name="uq_matches_profile_program"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     profile_id: Mapped[int] = mapped_column(

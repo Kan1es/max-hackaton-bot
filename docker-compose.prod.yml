@@ -1,0 +1,37 @@
+# Production overlay for a VPS. Use it explicitly — passing -f also skips
+# docker-compose.override.yml, which is for local development only:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Only Caddy is reachable from the internet (80 + HTTPS_PORT, 443 by default;
+# HTTPS via Let's Encrypt);
+# the API is served under https://$DOMAIN/api through the mini-app's nginx.
+
+services:
+  web:
+    ports: !reset []
+
+  miniapp:
+    ports: !reset []
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: hackaton_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "${HTTPS_PORT:-443}:${HTTPS_PORT:-443}"
+      - "${HTTPS_PORT:-443}:${HTTPS_PORT:-443}/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env, e.g. DOMAIN=maxnalog.ru}
+      HTTPS_PORT: ${HTTPS_PORT:-443}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - miniapp
+
+volumes:
+  caddy_data:
+  caddy_config:

@@ -17,12 +17,14 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-config.set_main_option("sqlalchemy.url", settings.async_database_url)
+# escape %, which configparser would otherwise read as interpolation
+config.set_main_option("sqlalchemy.url", settings.async_database_url.replace("%", "%%"))
 
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
-    url = config.get_main_option("sqlalchemy.url")
+    # Offline mode only renders SQL, so use the plain (sync) DSN.
+    url = settings.sync_database_url
     context.configure(
         url=url,
         target_metadata=target_metadata,

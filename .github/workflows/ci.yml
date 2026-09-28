@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements-dev.txt
+      - name: Run tests
+        run: pytest
+      - name: Migrations apply, roll back and agree with the models
+        # The schema comes from Alembic, so the migrations have to actually
+        # run — and `check` catches a model change nobody wrote one for.
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
+          alembic check
+        env:
+          SYNC_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/hackaton_db
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/hackaton_db
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: hackaton_db
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+  miniapp:
+    name: Mini app (vitest + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: miniapp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: miniapp/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  bot:
+    name: Bot (import check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r bot/requirements.txt
+      # The bot has no test suite yet; importing every module at least proves
+      # it is syntactically valid against the real maxapi API.
+      - run: python -c "import bot.main, bot.dialog, bot.keyboards, bot.api_client"
+        env:
+          MAX_BOT_TOKEN: ci-placeholder

@@ -1,199 +1,208 @@
-# Max Hackathon
+# Max Hackathon — «Навигатор мер поддержки»
 
-«Навигатор мер поддержки» — бот и mini app для MAX, которые помогают самозанятым/ИП находить гранты, льготные займы, субсидии и налоговые льготы. Backend — FastAPI + PostgreSQL (Alembic), диалоговый бот — отдельный сервис на [`maxapi`](bot/README.md), интерфейс mini app — в отдельной папке [`miniapp/`](miniapp/README.md).
+Бот и mini app для MAX, которые помогают самозанятым и ИП находить гранты, льготные займы, субсидии и налоговые льготы.
 
-## MAX-бот
+Три сервиса, один источник правды:
 
-Диалог сбора профиля (статус → регион → сфера → приоритет), синхронизация с Postgres на каждом шаге, подбор программ и выдача результата — см. [bot/README.md](bot/README.md). Поднимается вместе с остальным стеком через `docker compose up --build` (сервис `bot`).
+| Сервис | Что делает | Где код |
+|---|---|---|
+| **Backend** | FastAPI + PostgreSQL: каталог программ, профили, подбор, «Мои заявки» | `app/` |
+| **Бот** | Диалог сбора профиля в MAX, выдача подобранных программ | [`bot/`](bot/README.md) |
+| **Mini app** | React/Vite интерфейс: рекомендации, каталог, чек-листы документов | [`miniapp/`](miniapp/README.md) |
 
-## Mini app
-
-Локальный запуск интерфейса:
-
-```bash
-cd miniapp
-npm ci
-npm run dev
-```
-
-Проверка сборки: `npm run build`. Для отдельного контейнера: `docker build -t max-support-miniapp ./miniapp`. Подробности и ограничения демо описаны в [miniapp/README.md](miniapp/README.md). Интерфейс пока хранит профиль и сохранённые программы в браузере (мок-данные); backend уже предоставляет полноценные `/api/profile/`, `/api/programs/match/{id}` и `/api/applications/` — подключение mini app к этому API вместо локального мока остаётся отдельной задачей.
-
----
-
-## 🛠 Стек технологий
-
-- **Фреймворк:** [FastAPI](https://fastapi.tiangolo.com/) (Python 3.11+)
-- **СУБД:** [PostgreSQL 16](https://www.postgresql.org/)
-- **ORM:** [SQLAlchemy 2.0](https://docs.sqlalchemy.org/) (AsyncIO engine + asyncpg)
-- **Миграции:** [Alembic](https://alembic.sqlalchemy.org/) (с поддержкой async engine)
-- **Валидация данных:** [Pydantic v2](https://docs.pydantic.dev/) + [Pydantic-Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/)
-- **Контейнеризация:** Docker & Docker Compose
-
----
-
-## 📁 Структура проекта
-
-```text
-.
-├── Dockerfile                  # Описание сборки контейнера FastAPI
-├── docker-compose.yml          # Стек приложения (FastAPI + PostgreSQL + бот)
-├── bot/                        # MAX-бот (диалог, maxapi) — см. bot/README.md
-├── miniapp/                    # React/Vite mini app с отдельным Dockerfile
-├── requirements.txt            # Python-зависимости backend
-├── .env.example                # Пример переменных окружения (backend + бот)
-├── alembic.ini                 # Конфигурация Alembic
-├── alembic/
-│   ├── env.py                  # Асинхронный запуск миграций
-│   └── versions/
-│       └── 0001_initial.py     # Начальная миграция всех моделей
-└── app/
-    ├── main.py                 # Входная точка FastAPI + автосидинг мок-каталога программ
-    ├── core/
-    │   ├── config.py           # Настройки проекта (Pydantic Settings)
-    │   ├── options.py          # Канонические варианты диалога (в т.ч. для бота/mini app)
-    │   └── database.py         # Подключение к PostgreSQL (AsyncSession)
-    ├── db/
-    │   ├── seed.py             # Загрузка мок-каталога программ при первом старте
-    │   └── seed_data/support_programs.json
-    ├── services/
-    │   └── matching.py         # Rule-based подбор программ (регион+сфера+приоритет)
-    ├── models/                 # SQLAlchemy модели
-    │   ├── base.py             # Базовый класс и TimestampMixin
-    │   ├── user.py             # Пользователь MAX (User)
-    │   ├── profile.py          # Профиль, собранный ботом (Profile)
-    │   ├── support_program.py  # Каталог мер поддержки (SupportProgram)
-    │   ├── match.py            # Результаты подбора (Match)
-    │   └── application.py      # «Мои заявки» (Application)
-    ├── schemas/                # Pydantic схемы (DTO)
-    └── api/
-        ├── router.py
-        └── v1/
-            ├── router.py
-            └── endpoints/
-                ├── health.py       # Проверка здоровья сервиса и БД
-                ├── profiles.py     # POST /api/profile/
-                ├── programs.py     # GET /api/programs/match/{id}, /api/programs/{id}
-                ├── applications.py # POST/GET /api/applications/
-                └── classify.py     # POST /api/classify/ (заглушка NLP)
-```
-
----
-
-## 🗄 Модели данных
-
-1. **`users` (`User`)**:
-   - `id`: Первичный ключ
-   - `max_user_id`: Уникальный идентификатор пользователя в MAX
-   - `created_at`: Аудит времени
-
-2. **`profiles` (`Profile`)** — заполняется ботом по шагам, поля nullable до завершения диалога:
-   - `id`, `user_id` (FK → `users.id`, 1-to-1)
-   - `status`: `Самозанятый` / `Регистрирую ИП` / `ИП`
-   - `region`: регион работы
-   - `industry`: сфера деятельности
-   - `priority`: `Развитие` / `Деньги на старт` / `Льготный займ` / `Обучение` / `Налоговые льготы`
-
-   Варианты значений — единый источник [`app/core/options.py`](app/core/options.py), синхронизированный с ботом (`bot/options.py`) и mini app (`miniapp/src/data/programs.js`).
-
-3. **`support_programs` (`SupportProgram`)** — каталог мер поддержки:
-   - `id`, `name`, `description`, `region`, `industries[]`, `conditions`, `type` (вид поддержки — грант/кредит/субсидия/льгота), `amount`, `deadline`, `doc_checklist[]`, `source_url`
-   - `is_mock`: `True` — данные пока тестовый снапшот (см. `app/db/seed_data/support_programs.json`, 19 программ)
-
-4. **`matches` (`Match`)** — история подбора для аналитики:
-   - `id`, `profile_id` (FK), `program_id` (FK), `score`, `created_at`
-
-5. **`applications` (`Application`)** — «Мои заявки»:
-   - `id`, `profile_id` (FK), `program_id` (FK), `status` (`saved` / `in_progress` / `submitted`), `created_at`
+Бот и mini app **не содержат собственной копии данных или логики**: каталог программ, варианты ответов и правила подбора живут только на бэкенде и раздаются по HTTP. Профиль, сохранённые программы и отметки документов лежат в Postgres, поэтому чат и приложение всегда показывают одно и то же.
 
 ---
 
 ## 🚀 Быстрый старт
 
-### Вариант 1: Запуск через Docker Compose (Рекомендуемый)
+```bash
+cp .env.example .env
+# впишите MAX_BOT_TOKEN (у @MasterBot в MAX) и SERVICE_TOKEN:
+#   python3 -c "import secrets; print(secrets.token_urlsafe(32))"
 
-1. Скопируйте конфигурацию окружения:
-   ```bash
-   cp .env.example .env
-   ```
+docker compose up --build
+```
 
-2. Запустите сервис и базу данных:
-   ```bash
-   docker compose up --build
-   ```
+Поднимется весь стек:
 
-3. Сервис станет доступен:
-   - **Swagger Документация:** http://localhost:8000/docs
-   - **ReDoc:** http://localhost:8000/redoc
-   - **Health Check:** http://localhost:8000/health (а также http://localhost:8000/api/v1/health)
+| Адрес | Что это |
+|---|---|
+| http://localhost:8080 | Mini app (nginx, проксирует `/api` на backend) |
+| http://localhost:8000/docs | Swagger backend |
+| http://localhost:8000/health | Health check |
+| — | Бот (long polling, без публичного порта) |
+
+`docker-compose.yml` описывает прод-конфигурацию; `docker-compose.override.yml` подхватывается автоматически и добавляет локальные удобства — hot reload, проброс порта Postgres и `REQUIRE_SIGNED_INIT_DATA=False`, чтобы Swagger и curl работали без подписи. **При деплое этот файл нужно убрать.**
+
+### Без Docker
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+alembic upgrade head
+uvicorn app.main:app --reload
+
+# в соседних терминалах
+python -m bot.main
+cd miniapp && npm ci && npm run dev    # проксирует /api на localhost:8000
+```
+
+### Деплой на VPS (maxnalog.ru)
+
+1. В панели REG.RU → «DNS-серверы и управление зоной» задайте A-записи `@` и `www` = IP сервера (вместо адреса виртуального хостинга).
+2. Положите продакшен-окружение в `deploy/.env.production` (в git не попадает): `DOMAIN=maxnalog.ru`, `MINIAPP_URL=https://maxnalog.ru`, `HTTPS_PORT` (если 443 на сервере занят — например, `8444`, тогда адрес `https://maxnalog.ru:8444`), стойкий `POSTGRES_PASSWORD`, `REQUIRE_SIGNED_INIT_DATA=True`.
+3. Запустите с локальной машины:
+
+```bash
+./deploy/deploy.sh root@<IP сервера>
+```
+
+Скрипт ставит Docker (если его нет), копирует проект и поднимает `docker-compose.yml` + [`docker-compose.prod.yml`](docker-compose.prod.yml): наружу открыт только Caddy на 80 и `HTTPS_PORT` (443 по умолчанию), он сам выпускает и продлевает сертификат Let's Encrypt. `.env` на сервере создаётся один раз и при следующих деплоях не перезаписывается.
+
+4. В настройках бота на dev.max.ru укажите адрес mini app — `https://maxnalog.ru` (или с портом, если `HTTPS_PORT` не 443).
+
+> Бот работает через long polling: не запускайте его одновременно локально и на сервере — события будут делиться между процессами.
 
 ---
 
-### Вариант 2: Локальный запуск (без Docker)
+## 🔐 Аутентификация
 
-1. Создайте и активируйте виртуальное окружение:
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
+Профильные эндпоинты **не принимают идентификатор пользователя в теле или пути** — он берётся из аутентификации. Иначе любой мог бы прочитать чужие заявки, подставив соседний `profile_id`.
 
-2. Установите зависимости:
-   ```bash
-   pip install -r requirements.txt
-   ```
+| Кто | Как представляется | Проверка |
+|---|---|---|
+| Mini app | `Authorization: tma <WebApp.initData>` | HMAC-SHA256 подпись на `MAX_BOT_TOKEN` + срок жизни |
+| Бот | `X-Service-Token` + `X-Max-User-Id` | Сравнение с общим секретом `SERVICE_TOKEN` |
+| Swagger/curl | `X-Max-User-Id` | Только при `REQUIRE_SIGNED_INIT_DATA=False` |
 
-3. Настройте `.env` файл с вашим локальным PostgreSQL:
-   ```bash
-   cp .env.example .env
-   # Отредактируйте параметры подключения в .env при необходимости
-   ```
-
-4. Примените миграции:
-   ```bash
-   alembic upgrade head
-   ```
-
-5. Запустите сервер разработки:
-   ```bash
-   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-   ```
+`initDataUnsafe` в mini app используется **только** для отображения имени и никогда — как идентификатор.
 
 ---
 
 ## 📡 Эндпоинты
 
-Базовый путь: `/api/v1`.
+Базовый путь `/api/v1`.
 
-- **`GET /health`** (и **`GET /api/v1/health`**):
-  Возвращает состояние сервиса и статус подключения к PostgreSQL:
-  ```json
-  {
-    "status": "ok",
-    "database": "connected",
-    "version": "0.1.0"
-  }
-  ```
-- **`POST /api/v1/profile/`** — создать/частично обновить профиль по `max_user_id` (вызывается ботом после каждого шага диалога).
-- **`GET /api/v1/profile/by-max-user/{max_user_id}`** — получить профиль по идентификатору пользователя MAX.
-- **`GET /api/v1/programs/`** — список всех программ каталога.
-- **`GET /api/v1/programs/match/{profile_id}`** — топ-3 подходящие программы (rule-based, см. [`app/services/matching.py`](app/services/matching.py)); результат сохраняется в `matches`.
-- **`GET /api/v1/programs/{id}`** — карточка программы.
-- **`POST /api/v1/applications/`** — сохранить программу в «Мои заявки».
-- **`GET /api/v1/applications/{profile_id}`** — список сохранённых заявок профиля.
-- **`POST /api/v1/classify/`** — определение сферы деятельности по свободному тексту. Пока заглушка на ключевых словах (`app/api/v1/endpoints/classify.py`) — интеграция настоящей модели (rubert-tiny2) отдельным этапом.
+| Метод | Путь | Авторизация | Назначение |
+|---|---|---|---|
+| `GET` | `/health` (и `/api/v1/health`) | — | Состояние сервиса и БД |
+| `GET` | `/options/` | — | Канонические варианты ответов (их читают бот и mini app) |
+| `GET` | `/programs/` | — | Весь каталог программ |
+| `GET` | `/programs/{id}` | — | Карточка программы |
+| `GET` | `/programs/match/me?limit=3` | ✔ | Подбор под профиль вызывающего, с причинами и score |
+| `POST` | `/profile/` | ✔ | Частичное обновление своего профиля |
+| `GET` | `/profile/me` | ✔ | Свой профиль (создаётся пустым при первом обращении) |
+| `POST` | `/applications/` | ✔ | Сохранить программу в «Мои заявки» (идемпотентно) |
+| `GET` | `/applications/` | ✔ | Свои сохранённые программы |
+| `PATCH` | `/applications/{id}` | ✔ | Статус заявки и отметки чек-листа документов |
+| `DELETE` | `/applications/by-program/{id}` | ✔ | Убрать из сохранённых |
+| `POST` | `/classify/` | ✔ | Сфера деятельности по свободному тексту (LLM, запасной вариант — ключевые слова) |
+| `POST` | `/assistant/ask` | ✔ | ИИ-консультант: ответ на вопрос по каталогу с учётом профиля и истории диалога |
 
 ---
 
-## 🔄 Миграции базы данных (Alembic)
+## 🧮 Подбор программ
 
-- **Создать новую автоматическую миграцию после изменения моделей:**
-  ```bash
-  alembic revision --autogenerate -m "describe changes"
-  ```
-- **Применить все миграции к базе данных:**
-  ```bash
-  alembic upgrade head
-  ```
-- **Откатить последнюю миграцию:**
-  ```bash
-  alembic downgrade -1
-  ```
+Единственная реализация — [`app/services/matching.py`](app/services/matching.py). Работает так:
+
+1. **Жёсткий фильтр.** Отсеиваются программы другого региона и те, под чей статус заявитель заведомо не подходит (например, самозанятый и программа только для реестра МСП).
+2. **Причины.** Для каждой оставшейся программы собираются совпадения: регион (25), сфера (30), приоритет (25), статус (20).
+3. **Порог.** Программа показывается, если совпало **минимум две** причины.
+4. **Сортировка** по сумме весов, ничьи разрешаются по `id`, чтобы порядок не прыгал между запросами.
+
+Причины возвращаются клиенту текстом («подходит по сфере»), поэтому и бот, и mini app объясняют, почему программа предложена.
+
+> Это предварительный подбор. Возраст, доход, наличие в реестре МСП, задолженности и прочие условия участия не проверяются — это не решение о праве на поддержку.
+
+---
+
+## 🤖 ИИ-слой (OpenRouter)
+
+LLM подключена через [OpenRouter](https://openrouter.ai) — основная модель `qwen/qwen3.8-27b:free`, запасные перечислены через запятую в `OPENROUTER_MODEL` (OpenRouter сам переключается на следующую). Общий клиент — [`app/services/openrouter.py`](app/services/openrouter.py).
+
+| Функция | Где | Что делает |
+|---|---|---|
+| Классификация сферы | `POST /classify/`, [`llm_classifier.py`](app/services/llm_classifier.py) | Пользователь описывает бизнес своими словами — модель выбирает одну из отраслей |
+| ИИ-консультант | `POST /assistant/ask`, [`assistant.py`](app/services/assistant.py) | Отвечает на любые вопросы о мерах поддержки. Весь каталог и профиль передаются в промпт, модели запрещено выдумывать программы; программы, на которые опирается ответ, возвращаются id и превращаются в кнопки в боте |
+
+Особенности:
+
+- **Reasoning выключен** (`"reasoning": {"enabled": false}`): Qwen3 по умолчанию «думает», тратит на это ~250 токенов из `max_tokens` и втрое дольше отвечает — короткий бюджет классификатора возвращал пустой ответ.
+- **Ретраи 429.** У `:free` моделей общий лимит, 429 приходят и уходят за секунды — клиент повторяет запрос с нарастающей паузой, пока укладывается в таймаут (`OPENROUTER_TIMEOUT` для классификатора, `ASSISTANT_TIMEOUT` для консультанта).
+- **Деградация без ошибок.** Нет ключа, лимит, таймаут — `/classify` переходит на ключевые слова, консультант — на поиск по каталогу. Такие ответы помечены `is_stub: true`.
+- **Чистка ответа.** Markdown, внутренние номера `[3]` и случайные иероглифы (Qwen иногда переходит на китайский) вырезаются.
+
+Для стабильной работы на демо лучше платный ключ или модель без `:free` — бесплатный пул часто перегружен.
+
+---
+
+## 🗄 Модели данных
+
+| Таблица | Назначение |
+|---|---|
+| `users` | Пользователь MAX (`max_user_id`) |
+| `profiles` | Профиль из диалога: статус, регион, сфера, приоритет (1-к-1 с `users`) |
+| `support_programs` | Каталог мер поддержки |
+| `matches` | Текущий top-3 подбора на профиль, для аналитики (upsert, без дублей) |
+| `applications` | «Мои заявки»: статус + отметки документов (`checked_docs`) |
+
+Каталог программ — тестовый снапшот из 19 программ ([`app/db/seed_data/support_programs.json`](app/db/seed_data/support_programs.json), проверен 22.09.2026, у всех строк `is_mock=True`). Сидер синхронизирует его при каждом старте по полю `name`, поэтому правка файла применяется после перезапуска.
+
+---
+
+## 🧪 Тесты
+
+```bash
+pytest                       # backend: правила подбора, подпись initData, API
+cd miniapp && npm test       # mini app: клиент API, нормализация данных, рендер
+```
+
+API-тесты поднимают in-memory SQLite и не требуют запущенной базы. Они же покрывают главное: ни один пользователь не может прочитать или изменить данные другого.
+
+---
+
+## 🔄 Миграции
+
+```bash
+alembic upgrade head                      # применить
+alembic revision --autogenerate -m "..."  # создать после правки моделей
+alembic downgrade -1                      # откатить
+```
+
+В Docker `alembic upgrade head` выполняется автоматически перед стартом uvicorn. `create_all` включается только при `DEBUG=True` и нужен лишь для локальных экспериментов без миграций.
+
+---
+
+## 📁 Структура
+
+```text
+.
+├── app/
+│   ├── main.py                 # FastAPI + сидинг каталога на старте
+│   ├── core/
+│   │   ├── config.py           # Настройки (Pydantic Settings)
+│   │   ├── options.py          # Единственный источник вариантов ответов и ключевых слов
+│   │   ├── security.py         # Проверка initData и сервисного токена
+│   │   └── database.py         # AsyncSession
+│   ├── db/seed.py              # Синхронизация мок-каталога
+│   ├── services/               # matching (подбор), openrouter + llm_classifier + assistant (ИИ)
+│   ├── models/ schemas/        # SQLAlchemy модели и Pydantic DTO
+│   └── api/v1/endpoints/       # health, options, profiles, programs, applications, classify, assistant
+├── alembic/versions/           # 0001_initial, 0002_eligibility
+├── bot/                        # MAX-бот (maxapi)
+├── miniapp/                    # React/Vite mini app
+├── tests/                      # pytest: matching, security, schemas, API, данные каталога
+├── docker-compose.yml          # Прод-конфигурация стека
+├── docker-compose.override.yml # Локальные удобства (не для деплоя)
+└── .github/workflows/ci.yml    # Тесты backend, mini app и миграций
+```
+
+---
+
+## ⚠️ Что ещё не сделано
+
+- **ИИ на бесплатном тарифе.** `:free` модели OpenRouter часто отвечают 429 — тогда бот честно переходит на поиск по каталогу. Для прода нужен платный ключ.
+- **Реальные данные.** Каталог — снапшот, а не интеграция с МСП.РФ / Госуслугами.
+- **Уведомления.** Переключатели в профиле mini app ничего не рассылают.
+- **Состояние диалога бота** хранится в памяти процесса: рестарт сбрасывает незавершённые шаги (уже отвеченные — нет, они в Postgres).
