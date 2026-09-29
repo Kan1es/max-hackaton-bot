@@ -1,7 +1,32 @@
-# MAX-team-verified fork (see https://github.com/max-messenger/max-botapi-python#-установка-из-github).
-# The PyPI `maxapi` package tracks the original (unverified) fork instead —
-# switch to `maxapi>=1.2.0,<2.0.0` if you prefer PyPI releases.
-git+https://github.com/max-messenger/max-botapi-python.git
-httpx>=0.27.0,<1.0.0
-pydantic-settings>=2.2.0,<3.0.0
-python-dotenv>=1.0.1,<2.0.0
+# MAX bot. Pinned exactly, transitive dependencies included.
+#
+# maxapi comes from the MAX-team-verified fork
+# (https://github.com/max-messenger/max-botapi-python#-установка-из-github),
+# pinned to a commit so the build does not change when the fork moves.
+# The PyPI `maxapi` package tracks the original, unverified fork instead.
+maxapi @ git+https://github.com/max-messenger/max-botapi-python.git@4a286baa06d38f2db9f7244d94f89508743f8fee
+aiofiles==24.1.0
+aiohappyeyeballs==2.7.1
+aiohttp==3.14.3
+aiosignal==1.4.0
+annotated-types==0.8.0
+anyio==4.15.1
+attrs==26.1.0
+certifi==2026.7.22
+frozenlist==1.8.0
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.20
+magic-filter==1.0.12
+multidict==6.9.1
+packaging==26.3
+propcache==0.5.4
+puremagic==1.30
+pydantic==2.13.5
+pydantic-settings==2.15.0
+pydantic_core==2.46.5
+python-dotenv==1.2.3
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+yarl==1.25.1

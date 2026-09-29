@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import React from 'react';
 
@@ -120,6 +120,21 @@ describe('App', () => {
     expect(screen.getAllByText('Грант для IT').length).toBeGreaterThan(0);
     expect(screen.queryByText(/Не удалось загрузить данные/)).toBeNull();
     expect(api.getMatches).not.toHaveBeenCalled();
+  });
+
+  it('shares a program to a MAX chat from its card', async () => {
+    const shareMaxContent = vi.fn().mockResolvedValue(undefined);
+    window.WebApp = { initData: 'signed', shareMaxContent };
+    try {
+      renderApp();
+      await waitFor(() => expect(screen.getAllByText('Грант для IT').length).toBeGreaterThan(0));
+      fireEvent.click(screen.getAllByText('Грант для IT')[0]);
+      fireEvent.click(await screen.findByLabelText('Поделиться программой в MAX'));
+      await waitFor(() => expect(shareMaxContent).toHaveBeenCalledOnce());
+      expect(shareMaxContent.mock.calls[0][0].text).toContain('Грант для IT');
+    } finally {
+      delete window.WebApp;
+    }
   });
 
   it('still reports a 401 as an error inside MAX', async () => {

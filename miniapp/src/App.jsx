@@ -2,7 +2,7 @@ import React, { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useState } 
 import {
   ArrowLeft, ArrowRight, Bell, Bookmark, BriefcaseBusiness, Check, CheckCircle2,
   ChevronRight, CircleHelp, ExternalLink, FileText, Filter, Laptop,
-  LineChart, Mail, MapPin, RefreshCw, Search, ShieldCheck, SlidersHorizontal, Sparkles,
+  LineChart, Mail, MapPin, RefreshCw, Search, Share2, ShieldCheck, SlidersHorizontal, Sparkles,
   UserRound, X, Landmark, ListChecks, Pencil,
 } from 'lucide-react';
 import {
@@ -10,6 +10,7 @@ import {
 } from './data/programs.js';
 import { documentInfo } from './data/documents.js';
 import { useAppData } from './useAppData.js';
+import { BOT_URL, shareProgram } from './bridge.js';
 
 // Leaflet and its tiles are ~150 KB and only ever needed on the document
 // page, so they load on demand instead of on first paint.
@@ -145,7 +146,7 @@ function CatalogPage({ programs, recommendations, reasonsById, savedIds, onOpen,
   </div>;
 }
 
-function DetailPage({ program, reasons, saved, onSave, onChecklist, onBack }) {
+function DetailPage({ program, reasons, saved, onSave, onShare, onChecklist, onBack }) {
   const checkedAt = formatCheckedAt(program.checkedAt);
   const openSource = () => {
     if (!sourceIsHttp(program.sourceUrl)) return;
@@ -167,7 +168,7 @@ function DetailPage({ program, reasons, saved, onSave, onChecklist, onBack }) {
         <Card className="source-card"><h2>Источник данных</h2><p>{checkedAt ? (program.isMock ? `Снимок от ${checkedAt}. ` : `Проверено на официальном портале ${checkedAt}. `) : ''}Сроки и доступность могут измениться.</p>{sourceIsHttp(program.sourceUrl) && <button className="text-link" onClick={openSource}>Открыть источник <ExternalLink size={15} /></button>}</Card>
       </div>
     </div>
-    <div className="detail-actions"><Button variant="secondary" onClick={() => onSave(program.id)} className={`flex-1 save-action ${saved ? 'saved' : ''}`} icon={Bookmark} aria-pressed={saved} aria-label={saved ? 'Сохранено. Нажмите, чтобы убрать из моих программ' : 'Сохранить в мои программы'}>{saved ? 'Сохранено' : 'Сохранить'}</Button><Button onClick={onChecklist} className="flex-1">Получить чек-лист</Button></div>
+    <div className="detail-actions"><Button variant="secondary" onClick={() => onSave(program.id)} className={`flex-1 save-action ${saved ? 'saved' : ''}`} icon={Bookmark} aria-pressed={saved} aria-label={saved ? 'Сохранено. Нажмите, чтобы убрать из моих программ' : 'Сохранить в мои программы'}>{saved ? 'Сохранено' : 'Сохранить'}</Button><Button onClick={onChecklist} className="flex-1">Получить чек-лист</Button><Button variant="secondary" onClick={() => onShare(program)} icon={Share2} className="share-action" title="Поделиться программой" aria-label="Поделиться программой в MAX" /></div>
   </div>;
 }
 
@@ -320,10 +321,6 @@ function LoadingScreen() {
   </div>;
 }
 
-// Deep link to the bot: MAX opens the mini-app from its chat with a signed
-// initData, which is what unlocks the profile and saved programs.
-const BOT_URL = 'https://max.ru/t814_hakaton_max_bot';
-
 function GuestBanner() {
   return <div className="guest-banner" role="note">
     <CircleHelp size={20} />
@@ -379,6 +376,11 @@ export default function App() {
 
   const openDetail = id => go('detail', id);
   const openChecklist = id => go('checklist', id);
+  const share = async program => {
+    const outcome = await shareProgram(program);
+    if (outcome === 'copied') data.setToast('Описание программы скопировано — вставьте его в чат');
+    else if (outcome === 'unavailable') data.setToast('Не удалось поделиться программой');
+  };
   const activeTab = navItems.some(item => item.id === page.type) ? page.type : page.type === 'detail' ? 'catalog' : page.type === 'checklist' || page.type === 'document' ? 'saved' : 'home';
   const mobileActiveTab = ['catalog', 'detail'].includes(page.type) ? 'home' : activeTab;
   const selectedProgram = typeof page.id === 'number' ? programsById.get(page.id) : undefined;
@@ -390,7 +392,7 @@ export default function App() {
       {data.guest && <GuestBanner />}
       {page.type === 'home' && <HomePage profile={profile} savedCount={savedIds.length} recommendations={ranked} catalogSize={programs.length} onCatalog={() => goTab('catalog')} onOpen={openDetail} onProfile={() => goTab('profile')} />}
       {page.type === 'catalog' && <CatalogPage programs={programs} recommendations={ranked} reasonsById={reasonsById} savedIds={savedIds} onOpen={openDetail} onSave={data.toggleSaved} onBack={() => goTab('home')} />}
-      {page.type === 'detail' && selectedProgram && <DetailPage program={selectedProgram} reasons={reasonsById.get(selectedProgram.id) || []} saved={savedIds.includes(selectedProgram.id)} onSave={data.toggleSaved} onChecklist={() => openChecklist(selectedProgram.id)} onBack={back} />}
+      {page.type === 'detail' && selectedProgram && <DetailPage program={selectedProgram} reasons={reasonsById.get(selectedProgram.id) || []} saved={savedIds.includes(selectedProgram.id)} onSave={data.toggleSaved} onShare={share} onChecklist={() => openChecklist(selectedProgram.id)} onBack={back} />}
       {page.type === 'saved' && <SavedPage items={savedPrograms} checkedByProgram={checkedByProgram} catalogSize={programs.length} onOpen={openDetail} onChecklist={openChecklist} onCatalog={() => goTab('catalog')} />}
       {page.type === 'checklist' && selectedProgram && <ChecklistPage program={selectedProgram} checkedItems={checkedByProgram[selectedProgram.id] || []} onToggle={data.toggleDocument} onDocument={name => go('document', name)} onBack={back} />}
       {page.type === 'profile' && <ProfilePage profile={profile} options={options} prefs={prefs} onPrefs={patch => data.setPrefs(current => ({ ...current, ...patch }))} onProfile={data.updateProfile} />}

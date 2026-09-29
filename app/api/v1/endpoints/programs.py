@@ -8,6 +8,7 @@ from app.core.security import Caller, get_caller
 from app.models.match import Match
 from app.models.support_program import SupportProgram
 from app.schemas.support_program import SupportProgramMatchRead, SupportProgramRead
+from app.schemas.error import AUTH_ERRORS, NOT_FOUND
 from app.services.catalog import active_programs
 from app.services.matching import TOP_N, rank_programs
 
@@ -21,7 +22,7 @@ async def list_programs(db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
-@router.get("/match/me", response_model=list[SupportProgramMatchRead])
+@router.get("/match/me", response_model=list[SupportProgramMatchRead], responses=AUTH_ERRORS)
 async def match_programs(
     limit: int = Query(default=TOP_N, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
@@ -66,7 +67,7 @@ async def match_programs(
     ]
 
 
-@router.get("/{program_id}", response_model=SupportProgramRead)
+@router.get("/{program_id}", response_model=SupportProgramRead, responses=NOT_FOUND)
 async def get_program(program_id: int, db: AsyncSession = Depends(get_db)):
     program = await db.get(SupportProgram, program_id)
     if program is None:

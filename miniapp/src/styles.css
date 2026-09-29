@@ -150,6 +150,8 @@ h1,h2,h3,p { margin-top: 0; }
 .divider { height: 1px; background: #eef1f6; margin: 13px 0; }
 .source-card .text-link { margin-top: 12px; }
 .detail-actions { display: flex; gap: 11px; width: min(100%, 660px); margin-top: 18px; }
+/* Icon-only: the label would squeeze the two main actions on a phone. */
+.detail-actions .share-action { flex: none; width: 42px; padding: 0; }
 .save-action.saved { background: #dceaff; color: #155fc6; border-color: #b9d4fb; }
 .save-action.saved svg { fill: currentColor; }
 .toast { position: fixed; z-index: 20; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; align-items: center; gap: 9px; width: max-content; max-width: calc(100vw - 28px); padding: 12px 17px; border-radius: 11px; background: #173d75; color: white; box-shadow: 0 10px 30px rgba(15, 47, 90, .25); font-size: 13px; font-weight: 700; line-height: 1.35; }

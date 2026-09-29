@@ -9,6 +9,7 @@ from app.core.security import Caller, get_caller
 from app.models.application import Application
 from app.models.support_program import SupportProgram
 from app.schemas.application import ApplicationCreate, ApplicationRead, ApplicationUpdate
+from app.schemas.error import AUTH_ERRORS, NOT_FOUND
 
 router = APIRouter(prefix="/applications", tags=["Applications"])
 
@@ -22,7 +23,7 @@ async def _owned_application(db: AsyncSession, application_id: int, profile_id: 
     return application
 
 
-@router.post("/", response_model=ApplicationRead)
+@router.post("/", response_model=ApplicationRead, responses={**AUTH_ERRORS, **NOT_FOUND})
 async def create_application(
     payload: ApplicationCreate,
     db: AsyncSession = Depends(get_db),
@@ -57,7 +58,7 @@ async def create_application(
     return result.scalar_one()
 
 
-@router.get("/", response_model=list[ApplicationRead])
+@router.get("/", response_model=list[ApplicationRead], responses=AUTH_ERRORS)
 async def list_applications(
     db: AsyncSession = Depends(get_db),
     caller: Caller = Depends(get_caller),
@@ -74,7 +75,7 @@ async def list_applications(
     return result.scalars().all()
 
 
-@router.patch("/{application_id}", response_model=ApplicationRead)
+@router.patch("/{application_id}", response_model=ApplicationRead, responses={**AUTH_ERRORS, **NOT_FOUND})
 async def update_application(
     application_id: int,
     payload: ApplicationUpdate,
@@ -99,7 +100,7 @@ async def update_application(
     return result.scalar_one()
 
 
-@router.delete("/by-program/{program_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/by-program/{program_id}", status_code=status.HTTP_204_NO_CONTENT, responses=AUTH_ERRORS)
 async def delete_application_by_program(
     program_id: int,
     db: AsyncSession = Depends(get_db),

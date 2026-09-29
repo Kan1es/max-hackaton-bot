@@ -7,6 +7,7 @@ from app.core.security import Caller, get_caller
 from app.models.profile import Profile
 from app.models.user import User
 from app.schemas.profile import ProfileRead, ProfileUpsert
+from app.schemas.error import AUTH_ERRORS
 
 router = APIRouter(prefix="/profile", tags=["Profile"])
 
@@ -33,7 +34,7 @@ async def get_or_create_profile(db: AsyncSession, max_user_id: int) -> Profile:
     return profile
 
 
-@router.post("/", response_model=ProfileRead)
+@router.post("/", response_model=ProfileRead, responses=AUTH_ERRORS)
 async def upsert_profile(
     payload: ProfileUpsert,
     db: AsyncSession = Depends(get_db),
@@ -56,7 +57,7 @@ async def upsert_profile(
     return profile
 
 
-@router.get("/me", response_model=ProfileRead)
+@router.get("/me", response_model=ProfileRead, responses=AUTH_ERRORS)
 async def get_my_profile(
     db: AsyncSession = Depends(get_db),
     caller: Caller = Depends(get_caller),

@@ -42,6 +42,16 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
+    description=(
+        "API «Навигатора мер поддержки»: каталог программ, профиль пользователя, "
+        "подбор, «Мои заявки» и ИИ-консультант. Его используют бот и mini app в MAX.\n\n"
+        "Эндпоинты с данными пользователя требуют аутентификации одним из способов:\n"
+        "- `Authorization: tma <WebApp.initData>` — mini app (подпись HMAC-SHA256 "
+        "на токене бота);\n"
+        "- `X-Service-Token` + `X-Max-User-Id` — бот и проверка жюри.\n\n"
+        "Пользователь определяется только по аутентификации — прочитать чужие данные "
+        "подстановкой id нельзя."
+    ),
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     lifespan=lifespan,
 )
@@ -68,7 +78,8 @@ async def root_health_check(db: AsyncSession = Depends(get_db)):
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
-@app.get("/", tags=["Root"])
+# Out of the published contract: in production "/" is the mini-app, not this.
+@app.get("/", tags=["Root"], include_in_schema=False)
 async def root():
     return {
         "message": f"Welcome to {settings.PROJECT_NAME}",

@@ -11,6 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { api } from './api.js';
 import { normalizeProgram } from './data/programs.js';
+import { haptic } from './bridge.js';
 
 const PREFS_KEY = 'max-support-navigator-prefs-v2';
 const EMPTY_PROFILE = { status: null, region: null, industry: null, priority: null };
@@ -135,13 +136,16 @@ export function useAppData() {
           ...current,
           applications: current.applications.filter(item => item.program_id !== programId),
         }));
+        haptic('success');
         setToast('Программа убрана из «Моих программ»');
       } else {
         const created = await api.saveApplication(programId);
         setState(current => ({ ...current, applications: [created, ...current.applications] }));
+        haptic('success');
         setToast('Программа сохранена в «Моих программах»');
       }
     } catch (error) {
+      haptic('error');
       setToast(`Не удалось сохранить: ${error.message}`);
       await load();
     }
@@ -166,8 +170,10 @@ export function useAppData() {
         applications: previous.applications.map(item =>
           item.id === application.id ? { ...item, checked_docs: next } : item),
       }));
+      haptic('selection');
       await api.updateApplication(application.id, { checked_docs: next });
     } catch (error) {
+      haptic('error');
       setToast(`Не удалось отметить документ: ${error.message}`);
       await load();
     }

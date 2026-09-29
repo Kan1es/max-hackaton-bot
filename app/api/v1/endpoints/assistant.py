@@ -6,13 +6,14 @@ from app.core.database import get_db
 from app.core.security import Caller, get_caller
 from app.models.support_program import SupportProgram
 from app.schemas.assistant import AssistantProgramRef, AssistantRequest, AssistantResponse
+from app.schemas.error import AUTH_ERRORS
 from app.services.assistant import HistoryTurn, answer_question
 from app.services.catalog import active_programs
 
 router = APIRouter(prefix="/assistant", tags=["Assistant"])
 
 
-@router.post("/ask", response_model=AssistantResponse)
+@router.post("/ask", response_model=AssistantResponse, responses=AUTH_ERRORS)
 async def ask_assistant(
     payload: AssistantRequest,
     db: AsyncSession = Depends(get_db),

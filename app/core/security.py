@@ -89,9 +89,18 @@ def _user_id_from_init_data(fields: dict) -> int:
 
 
 async def get_caller(
-    authorization: Optional[str] = Header(default=None),
-    x_service_token: Optional[str] = Header(default=None),
-    x_max_user_id: Optional[int] = Header(default=None),
+    authorization: Optional[str] = Header(
+        default=None,
+        description="`tma <WebApp.initData>` — подписанные данные запуска mini app",
+    ),
+    x_service_token: Optional[str] = Header(
+        default=None,
+        description="Сервисный токен (SERVICE_TOKEN) для вызовов бота и проверки жюри",
+    ),
+    x_max_user_id: Optional[int] = Header(
+        default=None,
+        description="ID пользователя MAX; вместе с X-Service-Token",
+    ),
 ) -> Caller:
     """FastAPI dependency resolving the authenticated MAX user."""
     if authorization and authorization.lower().startswith("tma "):

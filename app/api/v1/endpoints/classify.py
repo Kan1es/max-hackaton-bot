@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends
 from app.core.options import INDUSTRY_KEYWORDS
 from app.core.security import Caller, get_caller
 from app.schemas.classify import ClassifyRequest, ClassifyResponse
+from app.schemas.error import AUTH_ERRORS
 from app.services.llm_classifier import classify_with_llm
 
 router = APIRouter(prefix="/classify", tags=["Classify"])
@@ -17,7 +18,7 @@ CONFIDENCE_PER_HIT = 0.1
 MAX_CONFIDENCE = 0.9
 
 
-@router.post("/", response_model=ClassifyResponse)
+@router.post("/", response_model=ClassifyResponse, responses=AUTH_ERRORS)
 async def classify_industry(
     payload: ClassifyRequest,
     caller: Caller = Depends(get_caller),

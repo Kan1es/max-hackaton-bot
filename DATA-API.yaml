@@ -1,0 +1,292 @@
+# Контракт обязательных проверок API «Навигатора мер поддержки».
+#
+# Полное описание методов и схем — openapi.json (OpenAPI 3.1, генерируется
+# из кода: python scripts/export_openapi.py). Здесь — только то, что
+# относится к основному сценарию: подбор программ под профиль и «Мои заявки».
+#
+# Подстановки:
+#   ${SERVICE_TOKEN}  — значение выдаётся на первом слайде презентации
+#                       (в репозитории секретов нет);
+#   {program_id}      — берётся из ответа проверки, указанной в `save`;
+#   {application_id}  — аналогично.
+# Проверки идут по порядку: следующие используют значения, сохранённые
+# предыдущими. Повторный прогон с тем же пользователем даёт те же коды —
+# все записывающие методы идемпотентны.
+
+schema_version: "1.0"
+
+solution:
+  name: "Навигатор мер поддержки для самозанятых и ИП"
+  team_id: "WIDECODERS"
+  repository: "https://github.com/Kan1es/max-hackaton-bot"
+
+base_url: "https://maxnalog.ru:8444/api/v1"
+# Локально (docker compose up): http://localhost:8000/api/v1
+
+content_type: "application/json"
+
+roles:
+  anonymous:
+    description: "Без аутентификации. Каталог и справочники — публичные."
+    headers: {}
+  user:
+    description: >
+      Предприниматель — пользователь MAX. Mini app представляется подписанным
+      `Authorization: tma <initData>`; его нельзя подделать вне MAX, поэтому
+      для автоматической проверки используется тот же путь, что и у бота:
+      сервисный токен + ID пользователя. ID ниже зарезервирован под проверку
+      и не принадлежит реальному человеку.
+    headers:
+      X-Service-Token: "${SERVICE_TOKEN}"
+      X-Max-User-Id: "900000001"
+  user_b:
+    description: "Второй тестовый пользователь — для проверки изоляции данных."
+    headers:
+      X-Service-Token: "${SERVICE_TOKEN}"
+      X-Max-User-Id: "900000002"
+
+test_data:
+  catalog: "app/db/seed_data/support_programs.json"   # 19 тестовых программ, is_mock=true
+  note: >
+    Тестовый каталог загружается в базу при каждом старте backend и виден,
+    пока реальных программ с госпорталов меньше 50. Реальные программы
+    отличаются полем is_mock=false и заполненным source.
+
+checks:
+  # ─── Доступность ────────────────────────────────────────────────────────
+  - id: health
+    title: "Сервис и база данных доступны"
+    method: GET
+    path: /health
+    role: anonymous
+    expected_status: [200]
+    response:
+      content_type: application/json
+      required_fields: [status, database, version]
+      equals: { status: "ok", database: "connected" }
+
+  # ─── Справочники и каталог ─────────────────────────────────────────────
+  - id: options
+    title: "Варианты ответов анкеты (из них строятся кнопки бота и формы mini app)"
+    method: GET
+    path: /options/
+    role: anonymous
+    expected_status: [200]
+    response:
+      content_type: application/json
+      required_fields: [status, region, industry, priority, application_status, other_region_label, industry_keywords]
+
+  - id: programs_list
+    title: "Каталог мер поддержки"
+    method: GET
+    path: /programs/
+    role: anonymous
+    expected_status: [200]
+    response:
+      content_type: application/json
+      type: array
+      min_items: 1
+      item_required_fields: [id, name, is_mock, created_at, updated_at]
+    save:
+      program_id: "$[0].id"
+
+  - id: program_card
+    title: "Карточка программы"
+    method: GET
+    path: /programs/{program_id}
+    params:
+      path: { program_id: "{program_id}" }
+    role: anonymous
+    expected_status: [200]
+    response:
+      content_type: application/json
+      required_fields: [id, name, is_mock]
+
+  - id: program_not_found
+    title: "Несуществующая программа"
+    method: GET
+    path: /programs/999999999
+    role: anonymous
+    expected_status: [404]
+    response:
+      content_type: application/json
+      required_fields: [detail]
+
+  # ─── Профиль ───────────────────────────────────────────────────────────
+  - id: auth_required
+    title: "Данные пользователя недоступны без аутентификации"
+    method: GET
+    path: /profile/me
+    role: anonymous
+    expected_status: [401]
+    response:
+      content_type: application/json
+      required_fields: [detail]
+
+  - id: profile_upsert
+    title: "Заполнение анкеты (то же делает бот после каждого ответа)"
+    method: POST
+    path: /profile/
+    role: user
+    params:
+      body:
+        status: "Самозанятый"
+        region: "Краснодарский край"
+        industry: "Услуги"
+        priority: "Деньги на старт"
+    expected_status: [200]
+    response:
+      content_type: application/json
+      required_fields: [id, user_id, status, region, industry, priority, created_at, updated_at]
+      equals: { status: "Самозанятый", region: "Краснодарский край" }
+
+  - id: profile_invalid
+    title: "Значение не из справочника отклоняется"
+    method: POST
+    path: /profile/
+    role: user
+    params:
+      body: { status: "Олигарх" }
+    expected_status: [422]
+    response:
+      content_type: application/json
+      required_fields: [detail]
+
+  - id: profile_me
+    title: "Профиль читается обратно"
+    method: GET
+    path: /profile/me
+    role: user
+    expected_status: [200]
+    response:
+      content_type: application/json
+      required_fields: [id, status, region, industry, priority]
+      equals: { industry: "Услуги", priority: "Деньги на старт" }
+
+  # ─── Подбор — основной результат сценария ──────────────────────────────
+  - id: match
+    title: "Подбор программ под профиль с причинами"
+    method: GET
+    path: /programs/match/me
+    role: user
+    params:
+      query: { limit: 3 }
+    expected_status: [200]
+    response:
+      content_type: application/json
+      type: array
+      max_items: 3
+      item_required_fields: [id, name, score, reasons, is_mock]
+    notes: >
+      Массив может быть пустым, если в каталоге нет программ хотя бы с двумя
+      совпадениями по профилю. Порядок стабилен: по убыванию score, затем по id.
+
+  - id: match_limit_invalid
+    title: "Некорректный limit"
+    method: GET
+    path: /programs/match/me
+    role: user
+    params:
+      query: { limit: 0 }
+    expected_status: [422]
+
+  # ─── «Мои заявки» ──────────────────────────────────────────────────────
+  - id: application_create
+    title: "Сохранить программу в «Мои заявки» (идемпотентно)"
+    method: POST
+    path: /applications/
+    role: user
+    params:
+      body: { program_id: "{program_id}" }
+    expected_status: [200]
+    response:
+      content_type: application/json
+      required_fields: [id, profile_id, program_id, status, checked_docs, created_at, program]
+      equals: { status: "saved" }
+    save:
+      application_id: "$.id"
+
+  - id: application_create_missing_program
+    title: "Сохранение несуществующей программы"
+    method: POST
+    path: /applications/
+    role: user
+    params:
+      body: { program_id: 999999999 }
+    expected_status: [404]
+
+  - id: applications_list
+    title: "Список сохранённых программ"
+    method: GET
+    path: /applications/
+    role: user
+    expected_status: [200]
+    response:
+      content_type: application/json
+      type: array
+      min_items: 1
+      item_required_fields: [id, program_id, status, checked_docs, program]
+
+  - id: application_update
+    title: "Статус заявки и отметки чек-листа документов"
+    method: PATCH
+    path: /applications/{application_id}
+    role: user
+    params:
+      path: { application_id: "{application_id}" }
+      body:
+        status: "in_progress"
+        checked_docs: ["Паспорт"]
+    expected_status: [200]
+    response:
+      content_type: application/json
+      required_fields: [id, status, checked_docs]
+      equals: { status: "in_progress" }
+
+  - id: application_isolation
+    title: "Чужую заявку нельзя изменить"
+    method: PATCH
+    path: /applications/{application_id}
+    role: user_b
+    params:
+      path: { application_id: "{application_id}" }
+      body: { status: "submitted" }
+    expected_status: [404]
+    notes: "404, а не 403: чужой пользователь не должен узнавать, существует ли id."
+
+  - id: application_delete
+    title: "Убрать программу из сохранённых"
+    method: DELETE
+    path: /applications/by-program/{program_id}
+    role: user
+    params:
+      path: { program_id: "{program_id}" }
+    expected_status: [204]
+    response:
+      body: empty
+
+# Не входят в обязательные проверки: зависят от внешней LLM (OpenRouter,
+# бесплатный тариф с лимитами). При её недоступности отвечают 200 с
+# is_stub=true — ответ по ключевым словам / поиску по каталогу.
+optional_checks:
+  - id: classify
+    method: POST
+    path: /classify/
+    role: user
+    params:
+      body: { text: "Пеку торты на заказ и продаю через соцсети" }
+    expected_status: [200]
+    response:
+      content_type: application/json
+      required_fields: [industry, confidence, is_stub]
+
+  - id: assistant
+    method: POST
+    path: /assistant/ask
+    role: user
+    params:
+      body: { question: "Какие гранты есть для самозанятых?", history: [] }
+    expected_status: [200]
+    response:
+      content_type: application/json
+      required_fields: [answer, programs, is_stub]
