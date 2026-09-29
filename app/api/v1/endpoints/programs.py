@@ -8,6 +8,7 @@ from app.core.security import Caller, get_caller
 from app.models.match import Match
 from app.models.support_program import SupportProgram
 from app.schemas.support_program import SupportProgramMatchRead, SupportProgramRead
+from app.services.catalog import active_programs
 from app.services.matching import TOP_N, rank_programs
 
 router = APIRouter(prefix="/programs", tags=["Programs"])
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/programs", tags=["Programs"])
 @router.get("/", response_model=list[SupportProgramRead])
 async def list_programs(db: AsyncSession = Depends(get_db)):
     """Full catalog. Public: it contains no user data."""
-    result = await db.execute(select(SupportProgram).order_by(SupportProgram.id))
+    result = await db.execute(active_programs().order_by(SupportProgram.id))
     return result.scalars().all()
 
 
@@ -36,7 +37,7 @@ async def match_programs(
     """
     profile = await get_or_create_profile(db, caller.max_user_id)
 
-    result = await db.execute(select(SupportProgram))
+    result = await db.execute(active_programs())
     scored = rank_programs(profile, result.scalars().all(), limit=limit)
 
     snapshot = scored[:TOP_N]

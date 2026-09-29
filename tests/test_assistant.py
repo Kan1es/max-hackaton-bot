@@ -70,3 +70,14 @@ def test_prompt_lists_matched_programs_first():
     prompt = build_system_prompt(profile, programs)
     assert prompt.index("[2] IT грант — подходит по профилю") < prompt.index("[1] Сельский грант")
     assert "Статус: ИП" in prompt
+
+
+def test_prompt_is_capped_and_keeps_what_the_question_is_about():
+    from app.services.assistant import MAX_PROMPT_PROGRAMS, select_prompt_programs
+
+    profile = FakeProfile()
+    programs = [_program(i, name=f"Программа {i}") for i in range(1, 101)]
+    programs.append(_program(500, name="Агрогрант для фермеров"))
+    selected = select_prompt_programs(profile, programs, "есть ли агрогрант?")
+    assert len(selected) == MAX_PROMPT_PROGRAMS
+    assert selected[0].id == 500

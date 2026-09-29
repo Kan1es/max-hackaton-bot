@@ -32,6 +32,41 @@ services:
     depends_on:
       - miniapp
 
+  # --- Real programs from official portals ---------------------------------
+  # The collector runs always. Sources behind Russian geo-blocking need the
+  # tunnel: enable it with COMPOSE_PROFILES=ru-tunnel, RU_SSH_HOST and
+  # COLLECTOR_PROXY=socks5://ru-tunnel:1080 in .env, once the Russian VPS
+  # accepts deploy/ru_tunnel_key.
+  ru-tunnel:
+    build: ./deploy/ru-tunnel
+    container_name: hackaton_ru_tunnel
+    restart: unless-stopped
+    profiles: ["ru-tunnel"]
+    environment:
+      RU_SSH_HOST: ${RU_SSH_HOST:-}
+      RU_SSH_USER: ${RU_SSH_USER:-root}
+      RU_SSH_PORT: ${RU_SSH_PORT:-22}
+    volumes:
+      - ./deploy/ru_tunnel_key:/run/ru_tunnel_key:ro
+
+  collector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hackaton_collector
+    restart: unless-stopped
+    command: python -m app.collector --loop
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-hackaton_db}
+    depends_on:
+      web:
+        condition: service_healthy
+      ru-tunnel:
+        condition: service_started
+        required: false
+
 volumes:
   caddy_data:
   caddy_config:

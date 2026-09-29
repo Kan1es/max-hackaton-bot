@@ -55,3 +55,5 @@ Thumbs.db
 
 # Production env generated for the VPS (contains secrets)
 deploy/.env.production
+deploy/ru_tunnel_key
+deploy/ru_tunnel_key.pub

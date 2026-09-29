@@ -113,6 +113,10 @@ def _program_card_text(program: dict, position: Optional[int] = None, total: Opt
         lines += [f"• {doc}" for doc in program["doc_checklist"]]
     if program.get("source_url"):
         lines.append(f"\n🔗 Источник: {program['source_url']}")
+    if not program.get("is_mock") and program.get("source"):
+        checked = program.get("checked_at")
+        suffix = f", проверено {checked}" if checked else ""
+        lines.append(f"\n🏛 Данные с официального портала{suffix}.")
     if program.get("is_mock"):
         checked = program.get("checked_at")
         suffix = f" · данные проверены {checked}" if checked else ""

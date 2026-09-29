@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.support_program import SupportProgram
+from app.services.catalog import refresh_demo_visibility
 
 logger = logging.getLogger("app.db.seed")
 
@@ -19,7 +20,8 @@ async def seed_support_programs(session: AsyncSession) -> None:
     once, so editing the seed file (or adding a column to the model) takes
     effect on the next restart instead of silently doing nothing because the
     table already had rows. Only `is_mock` rows are touched — real catalog
-    entries, once an official data source is wired up, are left alone.
+    entries collected from official portals are left alone, and the demo
+    rows stay hidden while any of those is active.
     """
     data = json.loads(SEED_FILE.read_text(encoding="utf-8"))
 
@@ -36,5 +38,10 @@ async def seed_support_programs(session: AsyncSession) -> None:
         for key, value in row.items():
             setattr(program, key, value)
 
+    await session.flush()
+    shown = await refresh_demo_visibility(session)
     await session.commit()
-    logger.info("Seeded support programs: %s new, %s refreshed", created, len(data) - created)
+    logger.info(
+        "Seeded support programs: %s new, %s refreshed, demo catalog %s",
+        created, len(data) - created, "shown" if shown else "hidden (real programs present)",
+    )

@@ -164,7 +164,7 @@ function DetailPage({ program, reasons, saved, onSave, onChecklist, onBack }) {
       <div className="detail-side">
         <Card><h2>Необходимые документы</h2><p className="document-summary">{program.documents.slice(0, 4).join(' · ')}{program.documents.length > 4 ? ' · …' : ''}</p><Button variant="secondary" onClick={onChecklist} className="full" icon={ListChecks}>Открыть чек-лист</Button></Card>
         <Card><h2>Условия и срок</h2><p>{program.amount}</p><div className="divider" /><p>{program.deadline}</p></Card>
-        <Card className="source-card"><h2>Источник данных</h2><p>{checkedAt ? `Снимок от ${checkedAt}. ` : ''}Сроки и доступность могут измениться.</p>{sourceIsHttp(program.sourceUrl) && <button className="text-link" onClick={openSource}>Открыть источник <ExternalLink size={15} /></button>}</Card>
+        <Card className="source-card"><h2>Источник данных</h2><p>{checkedAt ? (program.isMock ? `Снимок от ${checkedAt}. ` : `Проверено на официальном портале ${checkedAt}. `) : ''}Сроки и доступность могут измениться.</p>{sourceIsHttp(program.sourceUrl) && <button className="text-link" onClick={openSource}>Открыть источник <ExternalLink size={15} /></button>}</Card>
       </div>
     </div>
     <div className="detail-actions"><Button variant="secondary" onClick={() => onSave(program.id)} className={`flex-1 save-action ${saved ? 'saved' : ''}`} icon={Bookmark} aria-pressed={saved} aria-label={saved ? 'Сохранено. Нажмите, чтобы убрать из моих программ' : 'Сохранить в мои программы'}>{saved ? 'Сохранено' : 'Сохранить'}</Button><Button onClick={onChecklist} className="flex-1">Получить чек-лист</Button></div>

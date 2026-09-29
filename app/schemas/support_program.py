@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
@@ -22,6 +22,9 @@ class SupportProgramRead(BaseModel):
     source_url: Optional[str] = None
     checked_at: Optional[str] = None
     is_mock: bool
+    # Official portal the program was collected from; None for demo data.
+    source: Optional[str] = None
+    ends_at: Optional[date] = None
     created_at: datetime
     updated_at: datetime
 

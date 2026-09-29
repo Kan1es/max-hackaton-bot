@@ -14,7 +14,8 @@ cd "$(dirname "$0")/.."
 ssh "$TARGET" "command -v docker >/dev/null || curl -fsSL https://get.docker.com | sh"
 ssh "$TARGET" "mkdir -p $REMOTE_DIR"
 
-# --inplace keeps inodes, so the bind-mounted Caddyfile inside the running
+# deploy/ru_tunnel_key (gitignored) travels with the rest, permissions
+# included (-a). --inplace keeps inodes, so the bind-mounted Caddyfile inside the running
 # container sees the new content (a replaced file would stay stale there).
 rsync -az --delete --inplace \
   --exclude .git --exclude .venv --exclude '__pycache__' --exclude .pytest_cache \

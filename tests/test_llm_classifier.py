@@ -36,6 +36,7 @@ def _mock_transport(monkeypatch, handler):
 
     monkeypatch.setattr(openrouter.httpx, "AsyncClient", factory)
     monkeypatch.setattr(openrouter, "RATE_LIMIT_RETRY_DELAY", 0)
+    monkeypatch.setattr(openrouter, "_daily_quota_reset", 0.0)
 
 
 class TestClassifyWithLlm:
@@ -110,3 +111,25 @@ class TestOpenRouterClient:
         assert await openrouter.chat_completion(
             [{"role": "user", "content": "hi"}], max_tokens=10, timeout=5
         ) is None
+
+
+async def test_daily_quota_stops_all_calls_until_reset(monkeypatch):
+    import time
+
+    monkeypatch.setattr(settings, "OPENROUTER_API_KEY", "k")
+    calls = []
+    reset_ms = int((time.time() + 3600) * 1000)
+
+    def handler(request):
+        calls.append(1)
+        return httpx.Response(429, json={"error": {
+            "message": "Rate limit exceeded: free-models-per-day",
+            "metadata": {"headers": {"X-RateLimit-Reset": str(reset_ms)}}}})
+
+    _mock_transport(monkeypatch, handler)
+    messages = [{"role": "user", "content": "hi"}]
+    assert await openrouter.chat_completion(messages, max_tokens=5, timeout=10) is None
+    assert openrouter.daily_quota_exhausted()
+    # No retries for this 429, and no request at all afterwards.
+    assert await openrouter.chat_completion(messages, max_tokens=5, timeout=10) is None
+    assert len(calls) == 1

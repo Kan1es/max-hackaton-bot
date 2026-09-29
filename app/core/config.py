@@ -53,6 +53,35 @@ class Settings(BaseSettings):
     # longer budget; the bot waits up to ASSISTANT_TIMEOUT + a margin.
     ASSISTANT_TIMEOUT: float = 25.0
 
+    # Collector of real programs from official portals (python -m app.collector).
+    # Russian government sites refuse foreign IPs, so their requests may go
+    # through a proxy in Russia, e.g. socks5://ru-tunnel:1080. OpenRouter is
+    # always called directly.
+    COLLECTOR_PROXY: str = ""
+    # Comma-separated adapters to run; see app/collector/sources.
+    # msp_rf needs COLLECTOR_PROXY; corpmsp works without.
+    COLLECTOR_SOURCES: str = "corpmsp,msp_rf"
+    # МСП.РФ queries: regions (as the site names them; "г." is optional),
+    # applicant types (self = самозанятый, ip, yur, fiz) and support views
+    # (1 Деньги, 2 Обучение, 3 Маркетинг, 4 Консультирование, 8 Имущество…).
+    # Federal measures come back in every region and are stored once.
+    COLLECTOR_MSP_REGIONS: str = "Москва,Московская область,Краснодарский край,Санкт-Петербург"
+    COLLECTOR_MSP_APPLICANTS: str = "self,ip"
+    COLLECTOR_MSP_VIEWS: str = "1,2"
+    COLLECTOR_INTERVAL_HOURS: float = 24.0
+    # Upper bound per source and run, so a first run on a free LLM tier
+    # finishes in reasonable time. Unchanged items don't count against the LLM.
+    COLLECTOR_MAX_ITEMS: int = 300
+    # LLM extractions per run, across sources. The bot shares the account's
+    # quota: without credits OpenRouter allows 50 free-model requests a day,
+    # so the default leaves 20 for users. With credits (1000/day) raise it.
+    COLLECTOR_LLM_BUDGET: int = 30
+    # Pause between LLM extractions — free models are rate-limited.
+    COLLECTOR_LLM_DELAY: float = 3.0
+    COLLECTOR_LLM_TIMEOUT: float = 60.0
+    # The demo catalog is hidden once this many real programs are active.
+    DEMO_CATALOG_MIN_REAL: int = 50
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.endpoints.profiles import get_or_create_profile
@@ -8,6 +7,7 @@ from app.core.security import Caller, get_caller
 from app.models.support_program import SupportProgram
 from app.schemas.assistant import AssistantProgramRef, AssistantRequest, AssistantResponse
 from app.services.assistant import HistoryTurn, answer_question
+from app.services.catalog import active_programs
 
 router = APIRouter(prefix="/assistant", tags=["Assistant"])
 
@@ -22,7 +22,7 @@ async def ask_assistant(
     profile = await get_or_create_profile(db, caller.max_user_id)
     await db.commit()
 
-    result = await db.execute(select(SupportProgram).order_by(SupportProgram.id))
+    result = await db.execute(active_programs().order_by(SupportProgram.id))
     programs = result.scalars().all()
 
     answer = await answer_question(

@@ -6,6 +6,7 @@ have a non-LLM fallback and must never fail a request because of the model.
 """
 import asyncio
 import logging
+import time
 from typing import Dict, List, Optional
 
 import httpx
@@ -21,6 +22,32 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 # good share of them. The delay grows with each attempt.
 RATE_LIMIT_RETRY_DELAY = 1.5
 MAX_ATTEMPTS = 4
+
+
+# Epoch seconds until which the account's daily quota of free-model requests
+# is used up (50/day without credits). Until then every call would be a 429,
+# so none is made — retrying only burns time the user is waiting through.
+_daily_quota_reset = 0.0
+
+
+def daily_quota_exhausted() -> bool:
+    return time.time() < _daily_quota_reset
+
+
+def _note_daily_quota(response: httpx.Response) -> bool:
+    """True (and remembered) if this 429 is the per-day quota, not a busy pool."""
+    global _daily_quota_reset
+    if "free-models-per-day" not in response.text:
+        return False
+    try:
+        headers = response.json()["error"]["metadata"]["headers"]
+        reset = float(headers["X-RateLimit-Reset"]) / 1000
+    except (ValueError, KeyError, TypeError):
+        reset = time.time() + 3600
+    _daily_quota_reset = max(reset, time.time() + 60)
+    logger.warning("OpenRouter daily free-model quota is used up until %s",
+                   time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(_daily_quota_reset)))
+    return True
 
 
 def configured_models() -> List[str]:
@@ -40,7 +67,7 @@ async def chat_completion(
 ) -> Optional[str]:
     """Return the assistant message text, or None when there is no usable answer."""
     models = configured_models()
-    if not settings.OPENROUTER_API_KEY or not models:
+    if not settings.OPENROUTER_API_KEY or not models or daily_quota_exhausted():
         return None
 
     payload = {
@@ -72,6 +99,8 @@ async def chat_completion(
                 response = await client.post(
                     OPENROUTER_URL, json=payload, headers=headers, timeout=remaining
                 )
+                if response.status_code == 429 and _note_daily_quota(response):
+                    return None
                 if response.status_code == 429 and attempt < MAX_ATTEMPTS:
                     delay = RATE_LIMIT_RETRY_DELAY * attempt
                     if deadline - loop.time() - delay < 2:

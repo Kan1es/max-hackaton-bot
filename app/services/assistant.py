@@ -1,7 +1,8 @@
 """AI consultant: answers free-form questions about support programs.
 
-The whole catalog (a few dozen entries) fits comfortably in the prompt, so
-the model answers strictly from our data instead of from its own memory —
+The relevant part of the catalog goes into the prompt — programs matched to
+the profile first, then those the question mentions — so the model answers
+strictly from our data instead of from its own memory —
 it must not invent programs, amounts or deadlines. The programs it relies on
 are returned as ids, which lets the bot attach buttons to the real cards.
 
@@ -22,6 +23,8 @@ from app.services.openrouter import chat_completion
 logger = logging.getLogger(__name__)
 
 MAX_REFERENCED_PROGRAMS = 3
+# A real catalog runs to hundreds of programs; the prompt carries this many.
+MAX_PROMPT_PROGRAMS = 30
 
 SYSTEM_PROMPT = """Ты — ИИ-консультант бота «Навигатор мер поддержки» в мессенджере MAX. \
 Помогаешь самозанятым, начинающим и действующим ИП разобраться в грантах, льготных займах, \
@@ -119,11 +122,25 @@ def _program_text(program: SupportProgram, matched: bool) -> str:
     return "\n".join(lines)
 
 
-def build_system_prompt(profile, programs: Sequence[SupportProgram]) -> str:
+def select_prompt_programs(
+    profile, programs: Sequence[SupportProgram], question: str = ""
+) -> List[SupportProgram]:
+    """Matched programs, then ones the question is about, then the rest — capped."""
+    by_id = {p.id: p for p in programs}
+    ranked = [item.program.id for item in rank_programs(profile, list(programs), limit=len(programs) or 1)]
+    mentioned = keyword_search(question, programs, limit=MAX_PROMPT_PROGRAMS) if question else []
+    ordered: List[int] = []
+    for pid in [*ranked, *mentioned, *sorted(by_id)]:
+        if pid not in ordered:
+            ordered.append(pid)
+    return [by_id[pid] for pid in ordered[:MAX_PROMPT_PROGRAMS]]
+
+
+def build_system_prompt(profile, programs: Sequence[SupportProgram], question: str = "") -> str:
     matched_ids = {item.program.id for item in rank_programs(profile, list(programs), limit=len(programs) or 1)}
     # Matched programs first: the model leans on what it reads early.
-    ordered = sorted(programs, key=lambda p: (p.id not in matched_ids, p.id))
-    catalog = "\n\n".join(_program_text(p, p.id in matched_ids) for p in ordered)
+    selected = select_prompt_programs(profile, programs, question)
+    catalog = "\n\n".join(_program_text(p, p.id in matched_ids) for p in selected)
     return SYSTEM_PROMPT.format(profile=_profile_text(profile), catalog=catalog)
 
 
@@ -191,7 +208,7 @@ async def answer_question(
     history: Optional[Sequence[HistoryTurn]] = None,
 ) -> AssistantAnswer:
     messages: List[Dict[str, str]] = [
-        {"role": "system", "content": build_system_prompt(profile, programs)}
+        {"role": "system", "content": build_system_prompt(profile, programs, question)}
     ]
     for turn in history or []:
         messages.append({"role": turn.role, "content": turn.content})
